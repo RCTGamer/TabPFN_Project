@@ -1,0 +1,36 @@
+# Tiny synthetic data + sklearn backend: runs in well under a minute. Used by CI, the tests, and as a
+# sanity check after any code change before launching a long GPU run. Works for both experiments:
+#   python -m tabpfn_lab.cli aggregation --config configs/smoke.yaml
+#   python -m tabpfn_lab.cli coreset --config configs/smoke.yaml
+name: smoke
+backend: {name: sklearn, n_trees: 10}
+datasets:
+  dev:
+    - {name: syn_clf_dev, source: synthetic, task: classification, n: 500, n_features: 6, imbalance: [0.8, 0.12, 0.08], noise: 0.02, data_seed: 1}
+  confirm:
+    - {name: syn_clf_a, source: synthetic, task: classification, n: 600, n_features: 6, n_classes: 2, imbalance: 0.15, noise: 0.02, data_seed: 2}
+    - {name: syn_clf_b, source: synthetic, task: classification, n: 400, n_features: 8, imbalance: [0.8, 0.12, 0.08], noise: 0.02, data_seed: 3}
+    - {name: syn_reg, source: synthetic, task: regression, n: 400, n_features: 5, data_seed: 4}
+seeds: [0, 1]
+test_size: 0.3
+n_estimators: [1, 4]
+aggregators: [mean, logit_mean, median, trimmed_mean, entropy_weighted, val_weighted, mean_temp_offline]
+reg_aggregators: [mixture, log_pool, quantile_mean, quantile_median]
+references: [native, native_tuned]
+cache_dir: results/raw/smoke
+log_dir: results/logs
+
+# coreset (experiment B) part
+budget_fractions: [0.5, 0.3]
+budget_absolute: []
+coreset_methods: [random, stratified, balanced, kmeans_stratified, uncertainty_mix, embedding_kmeans,
+                  perest_random, perest_partition, builtin_subsample, builtin_majority_downsample]
+coreset_kwargs:
+  uncertainty_mix: {frac_hard: 0.5, pilot: 100}
+  embedding_kmeans: {pilot: 100}
+selection_seeds: [0, 1]
+split_seeds: [0]
+learning_curve_points: 6
+min_detectable_effect: 0.05
+alpha: 0.05
+planning: {sd_dataset: 0.02, sd_seed: 0.03}

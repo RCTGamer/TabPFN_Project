@@ -1,0 +1,36 @@
+# Experiment B on the GPU server. Tune on `dev` only; claims are made on `confirm` only (Holm over the
+# pre-registered family written to <out>.meta.json at launch). Run `cli plan` first.
+# Dataset ids are a starting set (n_train well above the largest budget); verify on OpenML and extend from
+# TabArena-medium / the BeyondArena large subset / TALENT large before making claims.
+name: coreset_v1
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}
+    - {name: higgs, source: openml, data_id: 23512, task: classification}
+  confirm:
+    - {name: covertype, source: openml, data_id: 1596, task: classification}
+    - {name: miniboone, source: openml, data_id: 41150, task: classification}
+    - {name: adult, source: openml, data_id: 1590, task: classification}
+    - {name: bank-marketing, source: openml, data_id: 1461, task: classification}
+    - {name: diamonds, source: openml, data_id: 42225, task: regression}
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: [0.5, 0.2, 0.1, 0.05, 0.01, 0.005, 0.001]
+budget_absolute: [500, 2000, 8000, 32000]
+coreset_methods: [random, stratified, balanced, kmeans_stratified, uncertainty_mix, embedding_kmeans,
+                  perest_random, perest_partition, builtin_subsample, builtin_majority_downsample]
+coreset_kwargs:
+  uncertainty_mix: {frac_hard: 0.5, pilot: 2000}
+  embedding_kmeans: {pilot: 2000}
+combined_aggregators: []     # experiment C: e.g. [median, entropy_weighted] once A has a winner
+selection_seeds: 10          # selection randomness; split held fixed per (dataset, split_seed)
+split_seeds: 3
+learning_curve_points: 6
+min_detectable_effect: 0.01  # relative metric improvement the design must be able to detect
+alpha: 0.05
+planning: {sd_dataset: 0.01, sd_seed: 0.02}   # prior used by `cli plan` when no --pilot is given
+cache_dir: results/raw
+log_dir: results/logs
+out_csv: results/tables/coreset_v1.csv

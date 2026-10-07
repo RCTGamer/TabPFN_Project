@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tabpfn-lab"
+version = "0.1.0"
+description = "Research harness for ensemble aggregation and context coresets on TabPFN"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scikit-learn>=1.4",
+    "scipy>=1.10",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+tabpfn = ["tabpfn==9.0.0", "torch"]
+dev = ["pytest>=7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "tabpfn: needs the real tabpfn package and a CUDA GPU (skipped otherwise; RUN_TABPFN=0 disables)",
+    "slow: statistical / simulation tests (deselect with -m 'not slow')",
+    "tier_large: real n >= 100k data on the GPU server (opt-in with RUN_TIER_LARGE=1)",
+]
+filterwarnings = ["ignore::UserWarning:sklearn.*"]

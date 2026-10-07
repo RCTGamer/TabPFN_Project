@@ -1,0 +1,29 @@
+# Experiment A on the GPU server: per-estimator outputs are cached once, every aggregator is scored offline.
+# Dataset ids are a starting set; verify them on OpenML and extend from TabArena / TALENT before claims.
+name: aggregation_v1
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}   # version: 3 | 3.5 | 3.5-fast
+datasets:
+  dev:
+    - {name: credit-g, source: openml, data_id: 31, task: classification}
+    - {name: phoneme, source: openml, data_id: 1489, task: classification}
+    - {name: houses, source: openml, data_id: 537, task: regression}
+  confirm:
+    - {name: kc1, source: openml, data_id: 1067, task: classification}
+    - {name: vehicle, source: openml, data_id: 54, task: classification}
+    - {name: phishing, source: openml, data_id: 4534, task: classification}
+    - {name: electricity, source: openml, data_id: 151, task: classification, max_rows: 20000}
+    - {name: bank-marketing, source: openml, data_id: 1461, task: classification, max_rows: 20000}
+    - {name: adult, source: openml, data_id: 1590, task: classification, max_rows: 20000}
+    - {name: wine-quality, source: openml, data_id: 287, task: regression}
+    - {name: elevators, source: openml, data_id: 216, task: regression}
+    - {name: diamonds, source: openml, data_id: 42225, task: regression, max_rows: 20000}
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+test_size: 0.3
+n_estimators: [1, 4, 8]        # one 8-estimator fit; 1 and 4 are its first estimators
+aggregators: [mean, logit_mean, median, trimmed_mean, entropy_weighted, val_weighted, mean_temp_offline]
+reg_aggregators: [mixture, log_pool, quantile_mean, quantile_median]
+references: [native, native_tuned]   # package's own prediction path
+val_fraction: 0.2
+cache_dir: results/raw
+log_dir: results/logs
+out_csv: results/tables/aggregation_v1.csv
