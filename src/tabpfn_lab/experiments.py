@@ -553,8 +553,9 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
         overrides = {"SUBSAMPLE_SAMPLES": int(budget), "SAMPLE_SUBSAMPLING_METHOD": sampler}
         out = ctx.outputs(split, X, y, E, seed, f"{method}:{budget}", overrides=overrides)
     elif method in cs.PER_ESTIMATOR_METHODS:
-        subsets = cs.per_estimator_subsets(method, X, y, budget, E, seed, task)
-        outs = [ctx.outputs(split, X[s], y[s], 1, seed * 1000 + e, f"{method}:{budget}:{e}") for e, s in enumerate(subsets)]
+        subsets = cs.per_estimator_subsets(method, X, y, budget, E, seed, task, **kw)
+        tag = f"{method}:{budget}" + (f":{json.dumps(kw, sort_keys=True)}" if kw else "")
+        outs = [ctx.outputs(split, X[s], y[s], 1, seed * 1000 + e, f"{tag}:{e}") for e, s in enumerate(subsets)]
         out = _stack_outputs(outs, task)
     elif method == CANARY:
         idx = cs.select_coreset("random", X, y, budget, seed, task)
