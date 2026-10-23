@@ -6,6 +6,7 @@ rerun. Exceptions inside a cell are recorded in `<name>.failures.csv` and the sw
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import time
@@ -36,7 +37,14 @@ from .validate import COLUMNS
 
 log = logging.getLogger("tabpfn_lab")
 
-BUILTIN_METHODS = {"builtin_subsample": "auto", "builtin_majority_downsample": "majority_downsample"}
+# tabpfn's own per-estimator row subsampling (SUBSAMPLE_SAMPLES + SAMPLE_SUBSAMPLING_METHOD); "auto" is stratified
+# for classification and balanced for regression, so builtin_balanced only adds a distinct method for classification.
+BUILTIN_METHODS = {
+    "builtin_subsample": "auto",
+    "builtin_balanced": "balanced",
+    "builtin_majority_downsample": "majority_downsample",
+}
+CLASSIFICATION_ONLY_B = {"builtin_balanced", "builtin_majority_downsample"}
 CANARY = "canary_shuffled"
 REFERENCE_METHODS_B = {"full", "random", CANARY, *BUILTIN_METHODS}
 REQUIRED_BASELINES_B = ["full", "random", "builtin_subsample", "builtin_majority_downsample"]
@@ -111,6 +119,12 @@ def normalize_config(cfg: dict, experiment: str) -> dict:
         c.setdefault("aggregator", "mean")
         c.setdefault("learning_curve_points", 6)
         c.setdefault("combined_aggregators", [])
+        c.setdefault("baseline", "random")  # what the pre-registered family compares every method against
+        # per-estimator subsets: one E-estimator fit with SUBSAMPLE_SAMPLES=[indices per estimator] (same ensemble
+        # members as the builtin_* rows), or E separate 1-estimator fits
+        c.setdefault("perest_mode", "single_fit")
+        if c["perest_mode"] not in ("single_fit", "separate_fits"):
+            raise ValueError(f"perest_mode must be single_fit or separate_fits, got {c['perest_mode']!r}")
     c.setdefault("out_csv", f"results/tables/{c['name']}_{experiment}.csv")
     c["experiment"] = experiment
     return c
@@ -178,6 +192,17 @@ class Cell:
         return f"{self.experiment}|{self.dataset}|s{self.split_seed}|r{self.seed}|{self.method}|{self.budget_key}|{self.budget}"
 
 
+def _key_overrides(overrides) -> dict:
+    """Overrides as they enter a cache key: explicit index lists are replaced by their hash."""
+    out = dict(overrides or {})
+    if isinstance(out.get("SUBSAMPLE_SAMPLES"), list):
+        h = hashlib.sha256()
+        for s in out["SUBSAMPLE_SAMPLES"]:
+            h.update(np.asarray(s, dtype=np.int64).tobytes() + b"|")
+        out["SUBSAMPLE_SAMPLES"] = f"indices:{h.hexdigest()[:16]}"
+    return out
+
+
 class Context:
     """Per-run state: backend, cache, splits, and run metadata."""
 
@@ -215,7 +240,7 @@ class Context:
     def outputs(self, split: Split, X, y, n_estimators, seed, subset_id, overrides=None, X_eval=None):
         """Per-estimator outputs of a backend fit on (X, y), evaluated on the split's test rows (or X_eval)."""
         X_eval = split.X_test if X_eval is None else X_eval
-        key = self._key(split, n_estimators, seed, subset_id, overrides=overrides or {})
+        key = self._key(split, n_estimators, seed, subset_id, overrides=_key_overrides(overrides))
 
         def compute():
             if split.task == "classification":
@@ -473,7 +498,7 @@ def coreset_methods_by_task(cfg) -> dict[str, list[str]]:
     for task in ("classification", "regression"):
         ms = []
         for m in cfg["coreset_methods"]:
-            if m == "builtin_majority_downsample" and task == "regression":
+            if m in CLASSIFICATION_ONLY_B and task == "regression":
                 continue
             ms.append(m)
             if m in cs.PRIOR_SHIFTING and task == "classification":
@@ -485,7 +510,15 @@ def coreset_methods_by_task(cfg) -> dict[str, list[str]]:
 
 
 def coreset_family(cfg, ctx) -> list[tuple[str, str, str]]:
-    """Pre-registered comparisons vs `random`: (method, budget_key, metric) over all confirm datasets."""
+    """Pre-registered comparisons vs cfg["baseline"]: (method, budget_key, metric) over all confirm datasets.
+
+    With the default `random` baseline the reference rows (full, builtin_*) are not tested; with another baseline
+    (e.g. builtin_subsample) every other method, `random` and the remaining builtin_* rows included, is tested against it.
+    """
+    baseline = cfg["baseline"]
+    if baseline not in cfg["coreset_methods"]:
+        raise ValueError(f"baseline {baseline!r} is not in coreset_methods")
+    skip = REFERENCE_METHODS_B if baseline == "random" else {"full", CANARY, baseline}
     tasks = {d.get("task", "classification") for d in ctx.specs.values() if d.get("split") == "confirm"}
     keys = sorted({k for name, d in ctx.specs.items() if d.get("split") == "confirm" for k in coreset_grid(cfg, ctx, name)[1]})
     fam = []
@@ -493,7 +526,7 @@ def coreset_family(cfg, ctx) -> list[tuple[str, str, str]]:
     for task in sorted(tasks):
         metrics = CLF_METRICS if task == "classification" else REG_METRICS
         for m in by_task[task]:
-            if m in REFERENCE_METHODS_B:
+            if m in skip:
                 continue
             for k in keys:
                 for metric in metrics:
@@ -515,7 +548,7 @@ def coreset_cells(cfg, ctx: Context) -> tuple[list[Cell], dict]:
                 cells.append(Cell("coreset", name, s, seed, "full", n, "full"))
                 for key, b in keys.items():
                     for m in methods:
-                        if m == "builtin_majority_downsample" and task == "regression":
+                        if m in CLASSIFICATION_ONLY_B and task == "regression":
                             continue
                         cells.append(Cell("coreset", name, s, seed, m, b, key))
                 if "random" in methods:
@@ -555,8 +588,11 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
     elif method in cs.PER_ESTIMATOR_METHODS:
         subsets = cs.per_estimator_subsets(method, X, y, budget, E, seed, task, **kw)
         tag = f"{method}:{budget}" + (f":{json.dumps(kw, sort_keys=True)}" if kw else "")
-        outs = [ctx.outputs(split, X[s], y[s], 1, seed * 1000 + e, f"{tag}:{e}") for e, s in enumerate(subsets)]
-        out = _stack_outputs(outs, task)
+        if cfg["perest_mode"] == "single_fit":
+            out = ctx.outputs(split, X, y, E, seed, tag, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]})
+        else:
+            outs = [ctx.outputs(split, X[s], y[s], 1, seed * 1000 + e, f"{tag}:{e}") for e, s in enumerate(subsets)]
+            out = _stack_outputs(outs, task)
     elif method == CANARY:
         idx = cs.select_coreset("random", X, y, budget, seed, task)
         y_bad = np.random.default_rng([seed, 999]).permutation(y[idx])

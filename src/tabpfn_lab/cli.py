@@ -17,6 +17,7 @@ import yaml
 
 from . import effect, stats
 from .experiments import (
+    CANARY,
     REFERENCE_METHODS_B,
     dataset_specs,
     failures_path,
@@ -126,11 +127,13 @@ def analyze_coreset(df: pd.DataFrame, meta: dict) -> dict[str, pd.DataFrame]:
     confirm = df[df["split"] == "confirm"]
     family = [tuple(f) for f in meta.get("family", [])]
     out = {}
-    out["family"] = stats.compare_family(confirm, family, baseline_for=lambda m: "random") if family else pd.DataFrame()
+    baseline = meta.get("config", {}).get("baseline", "random")
+    out["family"] = stats.compare_family(confirm, family, baseline_for=lambda m: baseline) if family else pd.DataFrame()
     effects = []
     for task, metric in (("classification", "log_loss"), ("regression", "rmse")):
         d = confirm[confirm["task"] == task]
-        for m in sorted(set(d["method"]) - REFERENCE_METHODS_B):
+        # every method incl. tabpfn's builtin_* samplers, measured against random and full data
+        for m in sorted(set(d["method"]) - {"full", "random", CANARY}):
             e = effect.effect_sizes(d, m, metric)
             if not e.empty:
                 effects.append(e)
@@ -162,7 +165,7 @@ def analyze(csv: Path, out_dir: Path | None = None) -> dict[str, pd.DataFrame]:
     out_dir = Path(out_dir or csv.parent)
     if (df["experiment"] == "coreset").any():
         res = analyze_coreset(df, meta)
-        print("== Experiment B (coreset) vs random, confirm datasets, Holm over the pre-registered family ==")
+        print(f"== Experiment B (coreset) vs {meta.get('config', {}).get('baseline', 'random')}, confirm datasets, Holm over the pre-registered family ==")
         fam = res["family"]
         for _, r in fam.iterrows() if len(fam) else []:
             print(f"[{r['budget_key']:>6}] " + _fmt(r.to_dict()))
