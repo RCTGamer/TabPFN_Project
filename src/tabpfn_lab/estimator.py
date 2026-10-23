@@ -129,7 +129,7 @@ class _TabPFNLabBase(BaseEstimator):
             return
         kw = dict(self.coreset_kwargs or {})
         if self.coreset in cs.PER_ESTIMATOR_METHODS:
-            subsets = cs.per_estimator_subsets(self.coreset, X_num, y, b, self.n_estimators, self.random_state, self._task)
+            subsets = cs.per_estimator_subsets(self.coreset, X_num, y, b, self.n_estimators, self.random_state, self._task, **kw)
             self.context_ = [(_take(Xb, s), y[s]) for s in subsets]
             self.perest_ = True
             return

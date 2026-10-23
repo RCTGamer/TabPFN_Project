@@ -15,6 +15,7 @@ from threadpoolctl import threadpool_limits
 MAX_DIMS = 50  # distance-based methods reduce wider inputs with PCA
 MAX_CLUSTERS = 128  # k-means centres per group; larger budgets are spread proportionally over clusters
 KMEANS_FIT_ROWS = 4000  # k-means is fit on at most this many rows (assignment is a linear pass)
+MIN_CELL_ROWS = 5  # `representative`: at least this many budget rows per stratum on average
 
 
 # --------------------------------------------------------------------------- helpers
@@ -183,6 +184,46 @@ def sel_balanced(X, y, budget, rng, task, seed):
     return _sample_groups(groups, alloc, rng)
 
 
+def _strata(X, y, budget, task, seed, n_cells):
+    """Row strata for representative sampling: label group (class / target bin) x k-means cell in feature space.
+
+    Returns (strata, alloc): a list of row-index arrays and the budget share of each, proportional to stratum size
+    (classes first, with every class kept when budget >= n_classes, then cells within each class).
+    """
+    from sklearn.cluster import KMeans
+
+    F = features(X, seed)
+    groups = _groups(y, task)
+    g_alloc = allocate([len(g) for g in groups], budget, min_one=task == "classification")
+    rng = np.random.default_rng([int(seed), 303])
+    strata, alloc = [], []
+    for g, a in zip(groups, g_alloc):
+        if a == 0:
+            continue
+        k = int(min(n_cells, a // MIN_CELL_ROWS, len(g)))  # few rows per cell -> rounding distorts the shares
+        if k <= 1:
+            strata.append(g)
+            alloc.append(int(a))
+            continue
+        fit_rows = rng.choice(len(g), min(len(g), max(KMEANS_FIT_ROWS, 10 * k)), replace=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            km = KMeans(n_clusters=k, n_init=1, max_iter=50, random_state=int(seed)).fit(F[g][fit_rows])
+        labels = km.predict(F[g])
+        cells = [g[labels == c] for c in range(k) if (labels == c).any()]
+        strata += cells
+        alloc += allocate([len(c) for c in cells], int(a)).tolist()
+    return strata, np.asarray(alloc, dtype=np.int64)
+
+
+def sel_representative(X, y, budget, rng, task, seed, n_cells=32):
+    """Size the training set down to a representative sample: stratify by class x feature-space cell (k-means)
+    and keep rows from every stratum in proportion to its size, at random within each. Keeps the class prior
+    and the feature-space density, unlike `kmeans_stratified`, which prefers the row nearest each centre."""
+    strata, alloc = _strata(X, y, budget, task, seed, n_cells)
+    return _sample_groups(strata, alloc, rng)
+
+
 def sel_kmeans_stratified(X, y, budget, rng, task, seed):
     """Per-class k-means; return the real row nearest each centroid (regression: per target bin)."""
     F = features(X, seed)
@@ -247,6 +288,7 @@ CORESET_METHODS = {
     "kmeans_stratified": sel_kmeans_stratified,
     "uncertainty_mix": sel_uncertainty_mix,
     "embedding_kmeans": sel_embedding_kmeans,
+    "representative": sel_representative,
 }
 PRIOR_SHIFTING = {"balanced", "uncertainty_mix"}
 CLASS_COVERAGE_EXEMPT = {"random"}
@@ -287,30 +329,46 @@ def select_coreset(method, X, y, budget, seed, task="classification", **kw) -> n
 # --------------------------------------------------------------------------- per-estimator methods
 
 
-def sub_perest_random(n, budget, n_estimators, seed):
+def sub_perest_random(X, y, budget, n_estimators, seed, task):
+    n = len(X)
     ss = np.random.SeedSequence(int(seed)).spawn(n_estimators)
     return [np.random.default_rng(s).choice(n, min(budget, n), replace=False) for s in ss]
 
 
-def sub_perest_partition(n, budget, n_estimators, seed):
+def sub_perest_partition(X, y, budget, n_estimators, seed, task):
     """Permute once; estimator e gets a cyclic window. The union covers all rows when E * budget >= n."""
+    n = len(X)
     perm = np.random.default_rng(int(seed)).permutation(n)
     b = min(budget, n)
     step = n / n_estimators if n_estimators * b >= n else b
     return [perm[(int(np.floor(e * step)) + np.arange(b)) % n] for e in range(n_estimators)]
 
 
+def sub_perest_representative(X, y, budget, n_estimators, seed, task, n_cells=32):
+    """`representative` per estimator: strata are built once, and each estimator draws its own proportional
+    sample within them, so every context is representative but the estimators see different rows."""
+    n = len(X)
+    ss = np.random.SeedSequence(int(seed)).spawn(n_estimators)
+    if budget >= n:
+        return [np.random.default_rng(s).permutation(n) for s in ss]
+    strata, alloc = _strata(X, y, budget, task, seed, n_cells)
+    return [_sample_groups(strata, alloc, np.random.default_rng(s)) for s in ss]
+
+
 PER_ESTIMATOR_METHODS = {
     "perest_random": sub_perest_random,
     "perest_partition": sub_perest_partition,
+    "perest_representative": sub_perest_representative,
 }
 
 
-def per_estimator_subsets(method, X, y, budget, n_estimators, seed, task="classification") -> list[np.ndarray]:
+def per_estimator_subsets(method, X, y, budget, n_estimators, seed, task="classification", **kw) -> list[np.ndarray]:
     if method not in PER_ESTIMATOR_METHODS:
         raise KeyError(f"unknown per-estimator method {method!r}; available: {sorted(PER_ESTIMATOR_METHODS)}")
     _check_budget(budget)
-    return [np.asarray(s, dtype=np.int64) for s in PER_ESTIMATOR_METHODS[method](len(X), int(budget), int(n_estimators), seed)]
+    with threadpool_limits(limits=1):
+        subsets = PER_ESTIMATOR_METHODS[method](X, y, int(budget), int(n_estimators), int(seed), task, **kw)
+    return [np.asarray(s, dtype=np.int64) for s in subsets]
 
 
 # --------------------------------------------------------------------------- prior correction

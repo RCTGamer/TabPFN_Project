@@ -228,40 +228,87 @@ class Backend(ABC):
 # --------------------------------------------------------------------------- built-in subsampling emulation
 
 
-def emulate_subsample(y, k, method, rng, task):
-    """Row indices for one estimator, emulating tabpfn's SUBSAMPLE_SAMPLES / SAMPLE_SUBSAMPLING_METHOD."""
-    from .coresets import allocate  # local import: coresets imports this module
+def _draw_from_pool(pool, size, pool_size, rng):
+    """Round-robin draw of `size` slots from a refillable shuffled pool (tabpfn's `_draw_balanced_from_pool`):
+    carried across estimators, so every slot is used about equally often over the ensemble."""
+    slots: list[int] = []
+    while len(slots) < size:
+        if not pool:
+            taken = set(slots)
+            pool = [i for i in range(pool_size) if i not in taken] or list(range(pool_size))
+            rng.shuffle(pool)
+        take = min(size - len(slots), len(pool))
+        slots += pool[:take]
+        pool = pool[take:]
+    return slots, pool
 
+
+def _stratified_counts(sizes, k):
+    """One slot per class, the rest proportional with largest remainder (tabpfn's `_compute_stratified_class_counts`)."""
+    if k < len(sizes):
+        raise ValueError(f"subsample_size ({k}) must be >= number of classes ({len(sizes)})")
+    raw = sizes / sizes.sum() * (k - len(sizes))
+    counts = np.floor(raw).astype(int) + 1
+    left = k - counts.sum()
+    if left > 0:
+        counts[np.argsort(-(raw - np.floor(raw)), kind="stable")[:left]] += 1
+    return counts
+
+
+def emulate_subsample(y, k, method, n_estimators, rng, task):
+    """Per-estimator row indices emulating tabpfn 9.0.0's SUBSAMPLE_SAMPLES / SAMPLE_SUBSAMPLING_METHOD
+    (preprocessing/ensemble.py): same allocation rules and round-robin pools, not the same random stream.
+    Returns None when no subsampling happens (k >= n)."""
     y = np.asarray(y)
     n = len(y)
-    k = int(k)
+    if isinstance(k, list):  # explicit index lists, cycled over the estimators
+        reps = [np.asarray(k[e % len(k)], dtype=np.int64) for e in range(n_estimators)]
+        return reps
+    k = min(int(k), n) if isinstance(k, (int, np.integer)) else int(float(k) * n) + 1
     if method == "auto":
         method = "stratified" if task == "classification" else "balanced"
+    if method == "stratified" and task != "classification":
+        raise ValueError("SAMPLE_SUBSAMPLING_METHOD='stratified' is only supported for classification")
+    if k >= n:
+        return None
+    _, inverse = np.unique(y, return_inverse=True)
+    inverse = inverse.reshape(-1)
+    sizes = np.bincount(inverse)
     if method == "majority_downsample":
-        values, inverse, counts = np.unique(y, return_inverse=True, return_counts=True)
-        top = counts.max()
-        if (counts == top).sum() != 1:
+        top = sizes.max()
+        if (sizes == top).sum() != 1:
             warnings.warn("majority_downsample: no unique majority value; falling back", stacklevel=2)
             method = "stratified" if task == "classification" else "balanced"
         else:
-            maj = int(np.argmax(counts))
-            non_maj = np.flatnonzero(inverse != maj)
-            if k <= len(non_maj):
+            maj = int(np.argmax(sizes))
+            whole = np.flatnonzero(inverse != maj)
+            if k <= len(whole):
                 raise ValueError(
-                    f"SUBSAMPLE_SAMPLES ({k}) must exceed the number of non-majority rows ({len(non_maj)}) "
+                    f"SUBSAMPLE_SAMPLES ({k}) must exceed the number of non-majority rows ({len(whole)}) "
                     "when using majority_downsample."
                 )
-            maj_rows = np.flatnonzero(inverse == maj)
-            take = rng.choice(maj_rows, min(k - len(non_maj), len(maj_rows)), replace=False)
-            return np.sort(np.concatenate([non_maj, take]))
-    if k >= n:
-        return np.arange(n)
-    if method == "stratified" and task == "classification":
-        groups = [np.flatnonzero(y == c) for c in np.unique(y)]
-        alloc = allocate(np.array([len(g) for g in groups]), k, min_one=True)
-        return np.sort(np.concatenate([rng.choice(g, a, replace=False) for g, a in zip(groups, alloc)]))
-    # "balanced" (label-agnostic) or anything else: uniform without replacement
-    return np.sort(rng.choice(n, k, replace=False))
+            rows, pool, out = np.flatnonzero(inverse == maj), [], []
+            for _ in range(n_estimators):
+                slots, pool = _draw_from_pool(pool, k - len(whole), len(rows), rng)
+                out.append(np.sort(np.concatenate([whole, rows[slots]])))
+            return out
+    if method == "stratified":
+        groups = [np.flatnonzero(inverse == c) for c in range(len(sizes))]
+        counts = _stratified_counts(sizes, k)
+        pools, out = [[] for _ in groups], []
+        for _ in range(n_estimators):
+            parts = []
+            for c, g in enumerate(groups):
+                slots, pools[c] = _draw_from_pool(pools[c], int(counts[c]), len(g), rng)
+                parts.append(g[slots])
+            out.append(np.sort(np.concatenate(parts)))
+        return out
+    # "balanced": label-agnostic round-robin over one globally shuffled pool
+    order, pool, out = rng.permutation(n), [], []
+    for _ in range(n_estimators):
+        slots, pool = _draw_from_pool(pool, k, n, rng)
+        out.append(np.sort(order[slots]))
+    return out
 
 
 # --------------------------------------------------------------------------- sklearn backend
@@ -295,11 +342,8 @@ class SklearnBackend(Backend):
         method = overrides.get("SAMPLE_SUBSAMPLING_METHOD", "auto")
         if method not in self.subsample_methods():
             raise ValueError(f"unknown SAMPLE_SUBSAMPLING_METHOD {method!r}")
-        out = []
-        for e in range(n_estimators):
-            rng = np.random.default_rng([int(seed), e, 7])
-            out.append(emulate_subsample(y_train, k, method, rng, task))
-        return out
+        rows = emulate_subsample(y_train, k, method, n_estimators, np.random.default_rng([int(seed), 7]), task)
+        return [None] * n_estimators if rows is None else rows
 
     def clf_outputs(self, X_train, y_train, X_test, classes, n_estimators, seed, overrides=None) -> ClfOutputs:
         X_train, X_test, y_train = np.asarray(X_train, float), np.asarray(X_test, float), np.asarray(y_train)
@@ -499,7 +543,10 @@ class TabPFNBackend(Backend):
             "softmax_temperature": float(resolved_softmax_temperature(model)),
         }
         if task not in self._config_dumped:
-            self._config_dumped[task] = _config_to_dict(model.get_inference_config())
+            d = _config_to_dict(model.get_inference_config())
+            if isinstance(d.get("SUBSAMPLE_SAMPLES"), list):  # explicit per-estimator indices: too large to log
+                d["SUBSAMPLE_SAMPLES"] = f"<{len(d['SUBSAMPLE_SAMPLES'])} index lists>"
+            self._config_dumped[task] = d
         meta["inference_config"] = self._config_dumped[task]
         return meta
 

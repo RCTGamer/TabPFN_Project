@@ -156,3 +156,42 @@ def test_prior_correct_restores_prior():
     out = cs.prior_correct(p, context_prior=[0.5, 0.5], target_prior=[0.9, 0.1])
     np.testing.assert_allclose(out[0], [0.9, 0.1])
     np.testing.assert_allclose(out.sum(1), 1)
+
+
+@pytest.mark.parametrize("method", ["representative", "perest_representative"])
+def test_representative_keeps_class_prior(method, data):
+    X, y = data
+    for b in (30, 90):
+        subs = [sel(method, X, y, b)] if method == "representative" else cs.per_estimator_subsets(method, X, y, b, 4, 0)
+        for s in subs:
+            assert len(s) == b and len(np.unique(s)) == b
+            target = np.bincount(y, minlength=3) / len(y) * b
+            assert np.abs(np.bincount(y[s], minlength=3) - target).max() <= 1
+
+
+def test_representative_spreads_over_feature_space():
+    # two well-separated blobs, 90% / 10% of the rows: proportional strata keep the small blob's share (5 of 50)
+    rng = np.random.default_rng(0)
+    X = np.vstack([rng.normal(0, 0.1, (900, 2)), rng.normal(10, 0.1, (100, 2))])
+    y = np.zeros(1000, dtype=int)
+    rep = [(cs.select_coreset("representative", X, y, 50, s) >= 900).sum() for s in range(20)]
+    rnd = [(cs.select_coreset("random", X, y, 50, s) >= 900).sum() for s in range(20)]
+    assert all(abs(r - 5) <= 1 for r in rep)
+    assert np.std(rep) < np.std(rnd)
+
+
+def test_perest_representative_subsets_differ_and_are_deterministic(data):
+    X, y = data
+    a = cs.per_estimator_subsets("perest_representative", X, y, 50, 4, 0)
+    b = cs.per_estimator_subsets("perest_representative", X, y, 50, 4, 0)
+    for s, t in zip(a, b):
+        np.testing.assert_array_equal(s, t)
+    assert len({tuple(sorted(s.tolist())) for s in a}) == 4
+    full = cs.per_estimator_subsets("perest_representative", X, y, len(X) + 5, 3, 0)
+    assert all(np.array_equal(np.sort(s), np.arange(len(X))) for s in full)
+
+
+def test_perest_representative_regression(reg_data):
+    X, y = reg_data
+    subs = cs.per_estimator_subsets("perest_representative", X, y, 60, 3, 1, "regression")
+    assert all(len(s) == 60 and len(np.unique(s)) == 60 for s in subs)

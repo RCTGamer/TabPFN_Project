@@ -23,8 +23,8 @@ log_dir: results/logs
 # coreset (experiment B) part
 budget_fractions: [0.5, 0.3]
 budget_absolute: []
-coreset_methods: [random, stratified, balanced, kmeans_stratified, uncertainty_mix, embedding_kmeans,
-                  perest_random, perest_partition, builtin_subsample, builtin_majority_downsample]
+coreset_methods: [random, stratified, balanced, kmeans_stratified, uncertainty_mix, embedding_kmeans, representative,
+                  perest_random, perest_partition, perest_representative, builtin_subsample, builtin_majority_downsample]
 coreset_kwargs:
   uncertainty_mix: {frac_hard: 0.5, pilot: 100}
   embedding_kmeans: {pilot: 100}

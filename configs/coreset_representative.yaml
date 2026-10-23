@@ -1,0 +1,37 @@
+# Experiment B follow-up: representative size-down, one shared context vs a fresh context per estimator.
+#   representative         class x k-means-cell strata, rows kept in proportion to stratum size (one subset, all estimators)
+#   perest_representative  same strata, each of the 8 estimators draws its own proportional sample
+# Comparisons that answer the question: representative vs random (does representative help?),
+# perest_representative vs perest_random (same, per estimator), perest_representative vs representative
+# (does giving each estimator its own context help?). Same datasets and budgets as coreset.yaml.
+name: coreset_representative_v1
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}
+    - {name: higgs, source: openml, data_id: 23512, task: classification}
+  confirm:
+    - {name: covertype, source: openml, data_id: 1596, task: classification}
+    - {name: miniboone, source: openml, data_id: 41150, task: classification}
+    - {name: adult, source: openml, data_id: 1590, task: classification}
+    - {name: bank-marketing, source: openml, data_id: 1461, task: classification}
+    - {name: diamonds, source: openml, data_id: 42225, task: regression}
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: [0.5, 0.2, 0.1, 0.05, 0.01, 0.005, 0.001]
+budget_absolute: [500, 2000, 8000, 32000]
+coreset_methods: [random, stratified, representative, perest_random, perest_representative,
+                  builtin_subsample, builtin_majority_downsample]
+coreset_kwargs:
+  representative: {n_cells: 32}
+  perest_representative: {n_cells: 32}
+selection_seeds: 10
+split_seeds: 3
+learning_curve_points: 6
+min_detectable_effect: 0.01
+alpha: 0.05
+planning: {sd_dataset: 0.01, sd_seed: 0.02}
+cache_dir: results/raw
+log_dir: results/logs
+out_csv: results/tables/coreset_representative_v1.csv
