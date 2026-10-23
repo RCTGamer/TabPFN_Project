@@ -164,6 +164,31 @@ def test_builtin_subsample_baseline_runs(tb, clf_data):
 
 
 @pytest.mark.tabpfn
+@pytest.mark.parametrize("task", ["classification", "regression"])
+def test_explicit_index_lists_reach_each_estimator(tb, clf_data, reg_data, task):
+    """perest_mode=single_fit passes SUBSAMPLE_SAMPLES=[indices per estimator]: all rows per estimator must equal
+    no subsampling, and different subsets must give different estimators."""
+    Xtr, ytr, Xte, _ = clf_data if task == "classification" else reg_data
+    call = (lambda **kw: tb.clf_outputs(Xtr, ytr, Xte, np.arange(3), 3, 0, **kw)) if task == "classification" else (
+        lambda **kw: tb.reg_outputs(Xtr, ytr, Xte, 3, 0, **kw))
+    field = "logits" if task == "classification" else "probs"
+    full = getattr(call(), field)
+    same = getattr(call(overrides={"SUBSAMPLE_SAMPLES": [np.arange(len(Xtr))] * 3}), field)
+    np.testing.assert_allclose(same, full, atol=ATOL)
+    rng = np.random.default_rng(0)
+    subsets = [np.sort(rng.choice(len(Xtr), 120, replace=False)) for _ in range(3)]
+    sub = getattr(call(overrides={"SUBSAMPLE_SAMPLES": subsets}), field)
+    assert sub.shape == full.shape and np.isfinite(sub).all() and not np.allclose(sub, full, atol=ATOL)
+
+
+@pytest.mark.tabpfn
+def test_builtin_balanced_runs(tb, clf_data):
+    Xtr, ytr, Xte, _ = clf_data
+    out = tb.clf_outputs(Xtr, ytr, Xte, np.arange(3), 4, 0, overrides={"SUBSAMPLE_SAMPLES": 60, "SAMPLE_SUBSAMPLING_METHOD": "balanced"})
+    assert out.logits.shape == (4, len(Xte), 3) and np.isfinite(out.logits).all()
+
+
+@pytest.mark.tabpfn
 def test_embedding_shapes(clf_data):
     Xtr, ytr, Xte, _ = clf_data
     clf = _stock("classification", 2, 0).fit(Xtr, ytr)

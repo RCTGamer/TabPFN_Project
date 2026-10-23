@@ -1,0 +1,47 @@
+# PILOT of coreset_builtin.yaml: same datasets, methods and baseline, ~2% of the cells (1 split seed, 2 selection
+# seeds, 4 budgets). Use it to check the GPU run end to end, see timings/memory in results/logs/, and estimate
+# noise for `cli plan --pilot`. Its numbers are a first look, not claims.
+# Experiment B against tabpfn's own per-estimator subsampling. Every method gets the same row budget per estimator;
+# the pre-registered family tests each one against builtin_subsample (Holm). Same datasets/budgets as coreset.yaml.
+#   builtin_subsample            SUBSAMPLE_SAMPLES=b, SAMPLE_SUBSAMPLING_METHOD=auto (stratified clf / balanced reg)  <- baseline
+#   builtin_balanced             label-agnostic round-robin over all rows (classification; = auto for regression)
+#   builtin_majority_downsample  keep every non-majority row, fill with majority rows (fails when b <= non-majority rows)
+#   perest_partition             our label-agnostic cyclic windows; should tie with builtin_balanced (plumbing check)
+#   perest_random                independent uniform draw per estimator
+#   perest_representative        class x k-means-cell proportional draw per estimator
+#   representative / random      one shared subset for all 8 estimators
+# perest_* go through SUBSAMPLE_SAMPLES=[indices per estimator] in one 8-estimator fit (perest_mode: single_fit),
+# so they use exactly the same ensemble members as the builtin_* rows and differ only in which rows each one sees.
+name: coreset_builtin_pilot
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}
+    - {name: higgs, source: openml, data_id: 23512, task: classification}
+  confirm:
+    - {name: covertype, source: openml, data_id: 1596, task: classification}
+    - {name: miniboone, source: openml, data_id: 41150, task: classification}
+    - {name: adult, source: openml, data_id: 1590, task: classification}
+    - {name: bank-marketing, source: openml, data_id: 1461, task: classification}
+    - {name: diamonds, source: openml, data_id: 42225, task: regression}
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: [0.1, 0.01, 0.001]
+budget_absolute: [2000]
+coreset_methods: [random, representative, perest_random, perest_partition, perest_representative,
+                  builtin_subsample, builtin_balanced, builtin_majority_downsample]
+coreset_kwargs:
+  representative: {n_cells: 32}
+  perest_representative: {n_cells: 32}
+baseline: builtin_subsample
+perest_mode: single_fit
+selection_seeds: 2
+split_seeds: 1
+learning_curve_points: 6
+min_detectable_effect: 0.01
+alpha: 0.05
+planning: {sd_dataset: 0.01, sd_seed: 0.02}
+cache_dir: results/raw
+log_dir: results/logs
+out_csv: results/tables/coreset_builtin_pilot.csv
