@@ -1,4 +1,4 @@
-"""Command line: python -m tabpfn_lab.cli {aggregation|coreset|analyze|merge|plan|validate} --config ...
+"""Command line: python -m tabpfn_lab.cli {aggregation|coreset|scaling|analyze|merge|plan|validate} --config ...
 
 Designed for tmux/nohup on a GPU server: no prompts, line-buffered logs in results/logs/, resumable, shardable.
 """
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import itertools
 import json
 import sys
 from pathlib import Path
@@ -24,10 +25,14 @@ from .experiments import (
     meta_path,
     normalize_config,
     read_results,
+    read_timing,
     run_aggregation,
     run_coreset,
+    run_scaling,
+    timing_path,
+    validate_timing,
 )
-from .metrics import CLF_METRICS, REG_METRICS
+from .metrics import CLF_METRICS, REG_METRICS, higher_is_better
 from .validate import validate_results
 
 
@@ -58,7 +63,7 @@ def validate_csv(csv: Path) -> list[str]:
     if fp.exists():
         failures = pd.read_csv(fp)
         failures = failures[~failures["cell"].isin(set(df["cell"]))].drop_duplicates("cell", keep="last")
-    return validate_results(
+    problems = validate_results(
         df,
         expected_methods=exp.get("methods"),
         expected_datasets=exp.get("datasets"),
@@ -68,13 +73,17 @@ def validate_csv(csv: Path) -> list[str]:
         required_baselines=exp.get("required_baselines"),
         min_random_budgets=6 if meta.get("experiment") == "coreset" and "random" in meta.get("config", {}).get("coreset_methods", []) else None,
     )
+    if meta.get("experiment") == "scaling":
+        tp = timing_path(csv)
+        problems += validate_timing(df, read_timing(tp) if tp.exists() else None)
+    return problems
 
 
 def merge(out_csv: Path) -> tuple[Path, list[str]]:
     """Concatenate `<name>.shard*.csv` (and failures / meta) into `<name>.csv`, then validate."""
     out_csv = Path(out_csv)
     pattern = str(out_csv.with_name(f"{out_csv.stem}.shard*{out_csv.suffix}"))
-    shards = sorted(p for p in glob.glob(pattern) if ".failures" not in p and not p.endswith(".meta.json"))
+    shards = sorted(p for p in glob.glob(pattern) if ".failures" not in p and ".timing" not in p and not p.endswith(".meta.json"))
     if not shards:
         raise FileNotFoundError(f"no shard files match {pattern}")
     df = pd.concat([read_results(p) for p in shards], ignore_index=True)
@@ -83,6 +92,9 @@ def merge(out_csv: Path) -> tuple[Path, list[str]]:
     fails = [pd.read_csv(failures_path(Path(p))) for p in shards if failures_path(Path(p)).exists()]
     if fails:
         pd.concat(fails, ignore_index=True).to_csv(failures_path(out_csv), index=False)
+    timings = [read_timing(timing_path(Path(p))) for p in shards if timing_path(Path(p)).exists()]
+    if timings:
+        pd.concat(timings, ignore_index=True).sort_values("cell", kind="stable").to_csv(timing_path(out_csv), index=False)
     metas = [json.loads(meta_path(Path(p)).read_text()) for p in shards if meta_path(Path(p)).exists()]
     if metas:
         m = dict(metas[0])
@@ -90,6 +102,8 @@ def merge(out_csv: Path) -> tuple[Path, list[str]]:
         m["merged_from"] = shards
         m["split_hashes"] = {k: v for mm in metas for k, v in mm.get("split_hashes", {}).items()}
         m["backend_meta"] = next((mm["backend_meta"] for mm in metas if mm.get("backend_meta")), {})
+        if "timing_csv" in m:
+            m["timing_csv"] = str(timing_path(out_csv))
         meta_path(out_csv).write_text(json.dumps(m, indent=2, sort_keys=True))
     return out_csv, validate_csv(out_csv)
 
@@ -157,13 +171,71 @@ def analyze_coreset(df: pd.DataFrame, meta: dict) -> dict[str, pd.DataFrame]:
     return out
 
 
+def _step_table(d: pd.DataFrame, along: str, fixed: list[str]) -> pd.DataFrame:
+    """Paired effect of moving one step up `along` (budget or n_estimators) with `fixed` held, matched on seed.
+
+    improvement > 0 means the larger setting is better; p is a two-sided paired t-test over seeds, Holm-adjusted
+    within the returned table.
+    """
+    from scipy.stats import ttest_rel
+
+    rows = []
+    for key, g in d.groupby(fixed):
+        levels = sorted(g[along].unique())
+        wide = g.pivot_table(index="seed", columns=along, values="value", aggfunc="first")
+        sign = 1.0 if higher_is_better(g["metric"].iloc[0]) else -1.0
+        for lo, hi in itertools.pairwise(levels):
+            pair = wide[[lo, hi]].dropna()
+            imp = sign * (pair[hi] - pair[lo])
+            n = len(imp)
+            p = float(ttest_rel(pair[hi], pair[lo]).pvalue) if n >= 2 and imp.std() > 0 else float("nan")
+            rows.append({**dict(zip(fixed, key)), f"{along}_from": lo, f"{along}_to": hi, "n_seeds": n,
+                         "value_from": float(pair[lo].mean()) if n else float("nan"), "value_to": float(pair[hi].mean()) if n else float("nan"),
+                         "improvement": float(imp.mean()) if n else float("nan"),
+                         "se": float(imp.std(ddof=1) / np.sqrt(n)) if n >= 2 else float("nan"), "p": p})
+    out = pd.DataFrame(rows)
+    if len(out):
+        ok = out["p"].notna()
+        out["p_holm"] = np.nan
+        out.loc[ok, "p_holm"] = stats.holm(out.loc[ok, "p"].to_numpy())
+        out["significant_holm"] = out["p_holm"] < 0.05
+    return out
+
+
+def analyze_scaling(df: pd.DataFrame, timing: pd.DataFrame | None) -> dict[str, pd.DataFrame]:
+    """Mean metric and cost per (dataset, budget, n_estimators), plus paired one-step effects of doubling the
+    context at fixed E and of the next estimator count at fixed context."""
+    keys = ["dataset", "task", "method", "metric", "budget", "n_estimators"]
+    g = df.groupby(keys)["value"]
+    summary = g.mean().rename("mean").to_frame().join(g.std().rename("sd")).join(g.count().rename("n_seeds")).reset_index()
+    summary["se"] = summary["sd"] / np.sqrt(summary["n_seeds"])
+    if timing is not None and len(timing):
+        cost = timing.groupby(["dataset", "budget", "n_estimators"])[["fit_seconds", "predict_seconds", "total_seconds", "peak_gpu_mb"]].mean()
+        summary = summary.merge(cost.reset_index(), on=["dataset", "budget", "n_estimators"], how="left")
+    ctx_steps = _step_table(df, "budget", ["dataset", "task", "method", "metric", "n_estimators"])
+    est_steps = _step_table(df, "n_estimators", ["dataset", "task", "method", "metric", "budget"])
+    return {"summary": summary, "context_steps": ctx_steps, "estimator_steps": est_steps}
+
+
 def analyze(csv: Path, out_dir: Path | None = None) -> dict[str, pd.DataFrame]:
     csv = Path(csv)
     df = read_results(csv)
     mp = meta_path(csv)
     meta = json.loads(mp.read_text()) if mp.exists() else {}
     out_dir = Path(out_dir or csv.parent)
-    if (df["experiment"] == "coreset").any():
+    if (df["experiment"] == "scaling").any():
+        tp = timing_path(csv)
+        res = analyze_scaling(df, read_timing(tp) if tp.exists() else None)
+        primary = res["summary"]["metric"].isin(["log_loss", "rmse"])
+        cols = [c for c in ["dataset", "method", "metric", "budget", "n_estimators", "mean", "se", "n_seeds", "total_seconds", "peak_gpu_mb"] if c in res["summary"]]
+        print("== scaling: mean over seeds (primary metrics; full tables in the .analysis.*.csv files) ==")
+        print(res["summary"].loc[primary, cols].to_string(index=False))
+        for k, title in (("context_steps", "doubling the context at fixed E"), ("estimator_steps", "next estimator count at fixed context")):
+            t = res[k]
+            if len(t):
+                print(f"\n== {title}: improvement > 0 is better, Holm-adjusted p ==")
+                print(t[t["metric"].isin(["log_loss", "rmse"])].to_string(index=False))
+    elif (df["experiment"] == "coreset").any():
         res = analyze_coreset(df, meta)
         print(f"== Experiment B (coreset) vs {meta.get('config', {}).get('baseline', 'random')}, confirm datasets, Holm over the pre-registered family ==")
         fam = res["family"]
@@ -220,18 +292,18 @@ def plan_from_config(cfg: dict, pilot: str | None = None, n_sim=300) -> dict:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="tabpfn_lab.cli")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    for name in ("aggregation", "coreset"):
+    for name in ("aggregation", "coreset", "scaling"):
         p = sub.add_parser(name)
         p.add_argument("--config", required=True)
         p.add_argument("--shard", type=parse_shard, default=None, help="i/N: run every N-th cell starting at i")
     p = sub.add_parser("analyze")
     p.add_argument("--config")
     p.add_argument("--csv")
-    p.add_argument("--experiment", choices=["aggregation", "coreset"], default=None)
+    p.add_argument("--experiment", choices=["aggregation", "coreset", "scaling"], default=None)
     p = sub.add_parser("merge")
     p.add_argument("--name", help="config name; merges results/tables/<name>.shard*.csv")
     p.add_argument("--config")
-    p.add_argument("--experiment", choices=["aggregation", "coreset"], default=None)
+    p.add_argument("--experiment", choices=["aggregation", "coreset", "scaling"], default=None)
     p.add_argument("--out-csv")
     p = sub.add_parser("validate")
     p.add_argument("--csv", required=True)
@@ -249,6 +321,11 @@ def main(argv=None) -> int:
         return 0
     if args.cmd == "coreset":
         csv = run_coreset(load_config(args.config), shard=args.shard)
+        problems = validate_csv(csv) if args.shard is None else []
+        _report(problems)
+        return 0
+    if args.cmd == "scaling":
+        csv = run_scaling(load_config(args.config), shard=args.shard)
         problems = validate_csv(csv) if args.shard is None else []
         _report(problems)
         return 0
@@ -286,7 +363,7 @@ def _csv_from_args(args) -> Path:
         return Path(args.out_csv)
     if getattr(args, "config", None):
         cfg = load_config(args.config)
-        exp = args.experiment or ("coreset" if "coreset_methods" in cfg else "aggregation")
+        exp = args.experiment or ("coreset" if "coreset_methods" in cfg else "scaling" if "budget_start" in cfg else "aggregation")
         return Path(normalize_config(cfg, exp)["out_csv"])
     if getattr(args, "name", None):
         hits = [p for p in glob.glob(f"results/tables/{args.name}*.shard0.csv")]

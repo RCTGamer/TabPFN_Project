@@ -1,0 +1,18 @@
+# Tiny sklearn-backend run of the scaling experiment (context size x estimator count), well under a minute:
+#   python -m tabpfn_lab.cli scaling --config configs/scaling_smoke.yaml
+name: scaling_smoke
+backend: {name: sklearn, n_trees: 10}
+datasets:
+  dev:
+    - {name: syn_clf, source: synthetic, task: classification, n: 1000, n_features: 6, n_classes: 3, imbalance: [0.6, 0.3, 0.1], noise: 0.02, data_seed: 1}
+    - {name: syn_reg, source: synthetic, task: regression, n: 800, n_features: 5, data_seed: 4}
+seeds: [0, 1, 2]
+test_size: 0.3
+budget_start: 64
+budget_factor: 2
+n_estimators: [1, 2, 4]
+aggregators: [mean]
+reg_aggregators: [mixture]
+cache_dir: null
+log_dir: results/logs
+out_csv: results/tables/scaling_smoke.csv

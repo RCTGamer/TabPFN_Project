@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import time
 import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -348,14 +349,19 @@ class SklearnBackend(Backend):
     def clf_outputs(self, X_train, y_train, X_test, classes, n_estimators, seed, overrides=None) -> ClfOutputs:
         X_train, X_test, y_train = np.asarray(X_train, float), np.asarray(X_test, float), np.asarray(y_train)
         logits = []
+        fit_s = predict_s = 0.0
         for e, rows in enumerate(self._subsets(y_train, n_estimators, seed, overrides, "classification")):
             Xe, ye = (X_train, y_train) if rows is None else (X_train[rows], y_train[rows])
+            t0 = _clock()
             rf = self._forest("classification", seed * 1000 + e).fit(Xe, ye)
+            t1 = _clock()
             p = rf.predict_proba(X_test)
+            predict_s += _clock() - t1
+            fit_s += t1 - t0
             c = p.shape[1]
             p = p * (1 - c * self.eps) + self.eps
             logits.append(align_logits(np.log(p), rf.classes_, classes))
-        meta = {"backend": self.name, "n_estimators_": int(n_estimators), "params": self.params()}
+        meta = {"backend": self.name, "n_estimators_": int(n_estimators), "params": self.params(), "timing": _timing(fit_s, predict_s)}
         return ClfOutputs(np.stack(logits), 1.0, np.asarray(classes), meta)
 
     def _borders(self, y_train):
@@ -375,15 +381,20 @@ class SklearnBackend(Backend):
         B = len(borders) - 1
         n = len(X_test)
         probs = []
+        fit_s = predict_s = 0.0
         for e, rows in enumerate(self._subsets(y_train, n_estimators, seed, overrides, "regression")):
             Xe, ye = (X_train, y_train) if rows is None else (X_train[rows], y_train[rows])
+            t0 = _clock()
             rf = self._forest("regression", seed * 1000 + e).fit(Xe, ye)
+            t1 = _clock()
             preds = np.stack([t.predict(X_test) for t in rf.estimators_], axis=1)  # (n, trees)
+            predict_s += _clock() - t1
+            fit_s += t1 - t0
             idx = np.clip(np.searchsorted(borders, preds, side="right") - 1, 0, B - 1)
             counts = np.zeros((n, B))
             np.add.at(counts, (np.repeat(np.arange(n), preds.shape[1]), idx.ravel()), 1.0)
             probs.append((counts + self.alpha) / (preds.shape[1] + self.alpha * B))
-        meta = {"backend": self.name, "n_estimators_": int(n_estimators), "params": self.params()}
+        meta = {"backend": self.name, "n_estimators_": int(n_estimators), "params": self.params(), "timing": _timing(fit_s, predict_s)}
         y_mean, y_std = float(y_train.mean()), float(y_train.std() or 1.0)
         return RegOutputs(np.stack(probs), BarDistribution(borders, full_support=False), y_mean, y_std, meta)
 
@@ -541,6 +552,7 @@ class TabPFNBackend(Backend):
             "device": str(self.device),
             "inference_precision": str(self.inference_precision),
             "softmax_temperature": float(resolved_softmax_temperature(model)),
+            "device_name": gpu_name() or str(self.device),
         }
         if task not in self._config_dumped:
             d = _config_to_dict(model.get_inference_config())
@@ -554,10 +566,15 @@ class TabPFNBackend(Backend):
         from tabpfn.base import resolved_softmax_temperature
 
         clf = self._make("classification", n_estimators, seed, inference_config=overrides)
+        t0 = _clock()
         self._fit(clf, X_train, y_train)
+        t1 = _clock()
         raw = clf.predict_raw_logits(X_test)  # (E, n, C_model), class permutations undone, no temperature
+        t2 = _clock()
         logits = align_logits(raw, clf.classes_, classes)
-        return ClfOutputs(logits, float(resolved_softmax_temperature(clf)), np.asarray(classes), self._meta(clf, "classification"))
+        meta = self._meta(clf, "classification")
+        meta["timing"] = _timing(t1 - t0, t2 - t1)
+        return ClfOutputs(logits, float(resolved_softmax_temperature(clf)), np.asarray(classes), meta)
 
     def native_clf(self, X_train, y_train, X_test, classes, n_estimators, seed, tuned=False) -> np.ndarray:
         kw = {"tuning_config": {"calibrate_temperature": True}} if tuned else {}
@@ -602,12 +619,16 @@ class TabPFNBackend(Backend):
 
     def reg_outputs(self, X_train, y_train, X_test, n_estimators, seed, overrides=None) -> RegOutputs:
         reg = self._make("regression", n_estimators, seed, inference_config=overrides)
+        t0 = _clock()
         self._fit(reg, X_train, y_train)
+        t1 = _clock()
         if getattr(reg, "is_constant_target_", False):
             raise ValueError("constant regression target: no per-estimator distributions to capture")
         probs = self._capture_reg(reg, X_test)
+        t2 = _clock()
         borders = reg.raw_space_bardist_.borders.detach().cpu().numpy().astype(np.float64)
         meta = self._meta(reg, "regression")
+        meta["timing"] = _timing(t1 - t0, t2 - t1)
         meta["ensemble_softmax_temperature"] = float(getattr(reg, "ensemble_softmax_temperature_", 1.0))
         return RegOutputs(probs, BarDistribution(borders, full_support=True), float(reg.y_train_mean_), float(reg.y_train_std_), meta)
 
@@ -673,3 +694,29 @@ def gpu_peak_mb() -> float:
     if torch is not None and torch.cuda.is_available():
         return torch.cuda.max_memory_allocated() / 2**20
     return float("nan")
+
+
+def gpu_name() -> str:
+    """Name of the current CUDA device, or "" without torch/CUDA (never imports torch itself)."""
+    import sys
+
+    torch = sys.modules.get("torch")
+    if torch is not None and torch.cuda.is_available():
+        return str(torch.cuda.get_device_name(torch.cuda.current_device()))
+    return ""
+
+
+def _clock() -> float:
+    """perf_counter after queued CUDA work has finished, so GPU time is charged to the phase that launched it."""
+    import sys
+
+    torch = sys.modules.get("torch")
+    if torch is not None and torch.cuda.is_available():
+        torch.cuda.synchronize()
+    return time.perf_counter()
+
+
+def _timing(fit_seconds, predict_seconds) -> dict:
+    """`fit` and the per-estimator prediction pass, in seconds. For tabpfn with fit_mode=fit_preprocessors
+    the transformer runs over context + test rows inside the prediction pass, so that is where context size shows."""
+    return {"fit_seconds": float(fit_seconds), "predict_seconds": float(predict_seconds)}
