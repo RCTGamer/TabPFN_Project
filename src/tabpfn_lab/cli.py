@@ -217,6 +217,41 @@ def analyze_scaling(df: pd.DataFrame, timing: pd.DataFrame | None) -> dict[str, 
     return {"summary": summary, "context_steps": ctx_steps, "estimator_steps": est_steps}
 
 
+def analyze_coreset_dev(df: pd.DataFrame, baseline: str, timing: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Exploratory table for a coreset run without confirm datasets: per dataset, budget, method and metric, the mean
+    over (split_seed, seed) and the paired difference to `baseline` (improvement > 0 is better), Holm-adjusted."""
+    from scipy.stats import ttest_rel
+
+    rows = []
+    for (d, task, b, metric), g in df.groupby(["dataset", "task", "budget", "metric"]):
+        wide = g.pivot_table(index=["split_seed", "seed"], columns="method", values="value", aggfunc="first")
+        sign = 1.0 if higher_is_better(metric) else -1.0
+        for m in wide.columns:
+            r = {"dataset": d, "task": task, "budget": b, "metric": metric, "method": m, "n": int(wide[m].notna().sum()),
+                 "mean": float(wide[m].mean()), "se": float(wide[m].std(ddof=1) / np.sqrt(wide[m].notna().sum()))}
+            r.update(improvement=np.nan, imp_se=np.nan, p=np.nan)
+            if baseline in wide.columns and m != baseline:
+                pair = wide[[m, baseline]].dropna()
+                imp = sign * (pair[m] - pair[baseline])
+                if len(imp) >= 2:
+                    r.update(improvement=float(imp.mean()), imp_se=float(imp.std(ddof=1) / np.sqrt(len(imp))))
+                    if imp.std() > 0:
+                        r["p"] = float(ttest_rel(pair[m], pair[baseline]).pvalue)
+            rows.append(r)
+    out = pd.DataFrame(rows)
+    if len(out):
+        ok = out["p"].notna()
+        out["p_holm"] = np.nan
+        out.loc[ok, "p_holm"] = stats.holm(out.loc[ok, "p"].to_numpy())
+        out["significant_holm"] = out["p_holm"] < 0.05
+        if timing is not None and "method" in timing.columns:
+            cost = timing.groupby(["dataset", "method"])[["total_seconds", "selection_seconds", "n_fits"]].mean().reset_index()
+            # extra rows (`+gate`, `_corrected`, `+aggregator`) share the cost of the cell that produced them
+            out["cell_method"] = out["method"].str.replace(r"(\+.*|_corrected)$", "", regex=True)
+            out = out.merge(cost.rename(columns={"method": "cell_method"}), on=["dataset", "cell_method"], how="left").drop(columns="cell_method")
+    return out
+
+
 def analyze(csv: Path, out_dir: Path | None = None) -> dict[str, pd.DataFrame]:
     csv = Path(csv)
     df = read_results(csv)
@@ -235,6 +270,14 @@ def analyze(csv: Path, out_dir: Path | None = None) -> dict[str, pd.DataFrame]:
             if len(t):
                 print(f"\n== {title}: improvement > 0 is better, Holm-adjusted p ==")
                 print(t[t["metric"].isin(["log_loss", "rmse"])].to_string(index=False))
+    elif (df["experiment"] == "coreset").any() and not (df["split"] == "confirm").any():
+        baseline = meta.get("config", {}).get("baseline", "random")
+        tp = timing_path(csv)
+        res = {"dev": analyze_coreset_dev(df, baseline, read_timing(tp) if tp.exists() else None)}
+        t = res["dev"]
+        cols = [c for c in ["dataset", "method", "metric", "mean", "se", "improvement", "imp_se", "p_holm", "significant_holm", "total_seconds"] if c in t]
+        print(f"== coreset, dev datasets only (exploratory): paired vs {baseline}, improvement > 0 is better, Holm-adjusted ==")
+        print(t.loc[t["metric"].isin(["log_loss", "rmse"]), cols].sort_values(["dataset", "improvement"], ascending=[True, False]).to_string(index=False))
     elif (df["experiment"] == "coreset").any():
         res = analyze_coreset(df, meta)
         print(f"== Experiment B (coreset) vs {meta.get('config', {}).get('baseline', 'random')}, confirm datasets, Holm over the pre-registered family ==")

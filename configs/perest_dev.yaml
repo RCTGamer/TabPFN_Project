@@ -1,0 +1,33 @@
+# Per-estimator context selection: 8 estimators, a different 1024-row context each, dev datasets only.
+#   python -m tabpfn_lab.cli coreset --config configs/perest_dev.yaml
+#   python -m tabpfn_lab.cli analyze --csv results/tables/perest_dev.csv
+# Groups: baselines (perest_random, perest_partition, builtin_subsample, perest_stratified), global coverage
+# (perest_representative, perest_kcenter), local contexts per test-feature group (local_mix: R of the rows from the
+# training rows nearest the group, the rest random; rows flagged "transductive"), and cluster experts (+gate).
+name: perest_dev
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}   # n_train ~32k, 8 features
+    - {name: houses, source: openml, data_id: 537, task: regression}            # n_train ~14k, 8 features
+    - {name: phoneme, source: openml, data_id: 1489, task: classification}      # n_train ~3.8k, 5 features
+  confirm: []
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: []
+budget_absolute: [1024]          # rows per estimator
+coreset_methods: [perest_random, perest_partition, builtin_subsample, perest_stratified,
+                  perest_representative, perest_kcenter, local_mix, cluster_experts]
+coreset_kwargs:
+  perest_representative: {n_cells: 32}
+local_ratios: [0.5, 0.75, 0.9, 1.0]   # share of each context taken from the rows nearest the test group
+local_groups: 8                       # k-means groups of the test rows (one 8-estimator fit per group)
+perest_mode: single_fit
+baseline: perest_random
+combined_aggregators: []
+split_seeds: 3
+selection_seeds: 3
+cache_dir: null
+log_dir: results/logs
+out_csv: results/tables/perest_dev.csv

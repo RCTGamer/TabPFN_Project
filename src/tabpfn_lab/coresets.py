@@ -69,30 +69,51 @@ def _sample_groups(groups, alloc, rng):
     return np.concatenate(parts) if parts else np.empty(0, dtype=np.int64)
 
 
-def features(X, seed=0, max_dims=MAX_DIMS) -> np.ndarray:
-    """Numeric, NaN-free, standardised features; PCA to at most `max_dims` dimensions (fit on a capped sample)."""
+def _fill(X, med) -> np.ndarray:
     X = np.asarray(X, dtype=np.float64)
     if X.ndim == 1:
         X = X[:, None]
     X = X.copy()
     nan = np.isnan(X)
     if nan.any():
+        X[nan] = np.take(med, np.nonzero(nan)[1])
+    return np.where(np.isfinite(X), X, 0.0)
+
+
+def feature_transform(X_fit, seed=0, max_dims=MAX_DIMS):
+    """The map behind `features`, with NaN medians, scaling and PCA learned from X_fit only, so other rows
+    (e.g. test features for routing) land in the same space: `feature_transform(X, s)(X) == features(X, s)`."""
+    X = np.asarray(X_fit, dtype=np.float64)
+    if X.ndim == 1:
+        X = X[:, None]
+    med = np.zeros(X.shape[1])
+    if np.isnan(X).any():
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN columns
             med = np.nanmedian(X, axis=0)
         med = np.where(np.isnan(med), 0.0, med)
-        X[nan] = np.take(med, np.nonzero(nan)[1])
-    X = np.where(np.isfinite(X), X, 0.0)
-    sd = X.std(axis=0)
-    X = (X - X.mean(axis=0)) / np.where(sd > 0, sd, 1.0)
+    X = _fill(X, med)
+    mu, sd = X.mean(axis=0), X.std(axis=0)
+    sd = np.where(sd > 0, sd, 1.0)
+    pca = None
     if X.shape[1] > max_dims:
         from sklearn.decomposition import PCA
 
+        Z = (X - mu) / sd
         rng = np.random.default_rng(seed)
-        fit_rows = rng.choice(len(X), min(len(X), 5000), replace=False)
-        pca = PCA(n_components=max_dims, svd_solver="randomized", random_state=seed).fit(X[fit_rows])
-        X = pca.transform(X)
-    return X
+        fit_rows = rng.choice(len(Z), min(len(Z), 5000), replace=False)
+        pca = PCA(n_components=max_dims, svd_solver="randomized", random_state=seed).fit(Z[fit_rows])
+
+    def apply(Xn) -> np.ndarray:
+        Z = (_fill(Xn, med) - mu) / sd
+        return Z if pca is None else pca.transform(Z)
+
+    return apply
+
+
+def features(X, seed=0, max_dims=MAX_DIMS) -> np.ndarray:
+    """Numeric, NaN-free, standardised features; PCA to at most `max_dims` dimensions (fit on a capped sample)."""
+    return feature_transform(X, seed, max_dims)(X)
 
 
 def _ensure_class_coverage(idx, y, rng, protected=0):
@@ -355,11 +376,152 @@ def sub_perest_representative(X, y, budget, n_estimators, seed, task, n_cells=32
     return [_sample_groups(strata, alloc, np.random.default_rng(s)) for s in ss]
 
 
+def sub_perest_stratified(X, y, budget, n_estimators, seed, task):
+    """`stratified` per estimator: class (target-bin) proportional, an independent draw for each estimator."""
+    n = len(X)
+    ss = np.random.SeedSequence(int(seed)).spawn(n_estimators)
+    if budget >= n:
+        return [np.random.default_rng(s).permutation(n) for s in ss]
+    return [sel_stratified(X, y, budget, np.random.default_rng(s), task, seed) for s in ss]
+
+
+def _kcenter(F, k, rng) -> np.ndarray:
+    """Greedy farthest-point k-center from a random start: every row ends up close to a chosen one."""
+    n = len(F)
+    picked = [int(rng.integers(n))]
+    d = ((F - F[picked[0]]) ** 2).sum(axis=1)
+    for _ in range(min(k, n) - 1):
+        j = int(np.argmax(d))
+        picked.append(j)
+        d = np.minimum(d, ((F - F[j]) ** 2).sum(axis=1))
+    return np.asarray(picked, dtype=np.int64)
+
+
+def sub_perest_kcenter(X, y, budget, n_estimators, seed, task):
+    """k-center coverage per estimator: within each class (target bin) a farthest-point cover of the feature space
+    with that group's proportional share of the budget; estimators differ by their random starting points."""
+    n = len(X)
+    ss = np.random.SeedSequence(int(seed)).spawn(n_estimators)
+    if budget >= n:
+        return [np.random.default_rng(s).permutation(n) for s in ss]
+    F = features(X, seed)
+    groups = _groups(y, task)
+    alloc = allocate([len(g) for g in groups], budget, min_one=task == "classification")
+    out = []
+    for s in ss:
+        rng = np.random.default_rng(s)
+        out.append(np.concatenate([g[_kcenter(F[g], int(a), rng)] for g, a in zip(groups, alloc) if a > 0]))
+    return out
+
+
+def _expert_clusters(X, n_clusters, seed):
+    """k-means of the training rows into one cluster per estimator: (feature map, model, train labels, train features)."""
+    from sklearn.cluster import KMeans
+
+    T = feature_transform(X, seed)
+    F = T(X)
+    rng = np.random.default_rng([int(seed), 404])
+    fit_rows = rng.choice(len(F), min(len(F), KMEANS_FIT_ROWS), replace=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        km = KMeans(n_clusters=int(min(n_clusters, len(fit_rows))), n_init=3, random_state=int(seed)).fit(F[fit_rows])
+    return T, km, km.predict(F), F
+
+
+def sub_cluster_experts(X, y, budget, n_estimators, seed, task):
+    """Estimator e specialises on training cluster e: `budget` random rows of the cluster, topped up with the
+    rows of other clusters nearest its centre when the cluster is smaller than the budget."""
+    n = len(X)
+    _, km, labels, F = _expert_clusters(X, n_estimators, seed)
+    out = []
+    for e, s in enumerate(np.random.SeedSequence(int(seed)).spawn(n_estimators)):
+        rng = np.random.default_rng(s)
+        c = e % len(km.cluster_centers_)
+        own = np.flatnonzero(labels == c)
+        if len(own) >= budget:
+            idx = rng.choice(own, budget, replace=False)
+        else:
+            d = ((F - km.cluster_centers_[c]) ** 2).sum(axis=1)
+            d[own] = np.inf
+            idx = np.concatenate([own, np.argsort(d, kind="stable")[: min(budget, n) - len(own)]])
+        if task == "classification":
+            idx = _ensure_class_coverage(idx, y, rng)
+        out.append(idx)
+    return out
+
+
+def cluster_gate(X_train, X_test, n_estimators, seed) -> np.ndarray:
+    """(E, n_test) weights for `cluster_experts`: softmax over estimators of -d(x, centre_e)^2 / tau, with tau the
+    median squared distance of training rows to their own centre. Uses test features only."""
+    with threadpool_limits(limits=1):
+        T, km, labels, F = _expert_clusters(X_train, n_estimators, seed)
+        C = km.cluster_centers_
+        tau = float(np.median(((F - C[labels]) ** 2).sum(axis=1))) or 1.0
+        d = ((T(X_test)[None, :, :] - C[:, None, :]) ** 2).sum(axis=2)  # (K, n_test)
+        d = d[np.arange(n_estimators) % len(C)]
+        z = -(d - d.min(axis=0, keepdims=True)) / tau
+        w = np.exp(z)
+    return w / w.sum(axis=0, keepdims=True)
+
+
 PER_ESTIMATOR_METHODS = {
     "perest_random": sub_perest_random,
     "perest_partition": sub_perest_partition,
     "perest_representative": sub_perest_representative,
+    "perest_stratified": sub_perest_stratified,
+    "perest_kcenter": sub_perest_kcenter,
+    "cluster_experts": sub_cluster_experts,
 }
+
+
+# --------------------------------------------------------------------------- local contexts (routed by test features)
+
+
+def local_mix_routing(X_train, y_train, X_test, budget, n_estimators, seed, task="classification", ratio=0.9, n_groups=8, pool_factor=2):
+    """Group the test rows by their features (k-means, never labels) and build, per group and estimator, a context of
+    round(ratio * budget) rows drawn from the pool_factor-times-larger set of training rows nearest the group centre
+    plus random rows from the rest of the training split. Returns [(test_row_indices, [subset per estimator])].
+
+    The contexts depend on the whole test batch, so results built on this are transductive.
+    """
+    from sklearn.cluster import KMeans
+
+    if not 0 <= ratio <= 1:
+        raise ValueError(f"ratio must be in [0, 1], got {ratio}")
+    _check_budget(budget)
+    n, m = len(X_train), len(X_test)
+    with threadpool_limits(limits=1):
+        T = feature_transform(X_train, seed)
+        Ftr, Fte = T(X_train), T(X_test)
+        G = int(max(1, min(n_groups, m)))
+        fit_rows = np.random.default_rng([int(seed), 505]).choice(m, min(m, KMEANS_FIT_ROWS), replace=False)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            km = KMeans(n_clusters=min(G, len(fit_rows)), n_init=3, random_state=int(seed)).fit(Fte[fit_rows])
+        labels = km.predict(Fte)
+        b = min(int(budget), n)
+        n_local = round(ratio * b)
+        out = []
+        for g in range(len(km.cluster_centers_)):
+            rows = np.flatnonzero(labels == g)
+            if not len(rows):
+                continue
+            order = np.argsort(((Ftr - km.cluster_centers_[g]) ** 2).sum(axis=1), kind="stable")
+            pool = order[: min(n, max(n_local, pool_factor * n_local))]
+            subsets = []
+            for s in np.random.SeedSequence([int(seed), g]).spawn(n_estimators):
+                rng = np.random.default_rng(s)
+                if b >= n:
+                    subsets.append(rng.permutation(n))
+                    continue
+                local = rng.choice(pool, n_local, replace=False)
+                rest = rng.choice(np.setdiff1d(np.arange(n), local), b - n_local, replace=False)
+                idx = np.concatenate([rest, local]).astype(np.int64)  # random part first: coverage swaps use it first
+                if task == "classification":
+                    idx = _ensure_class_coverage(idx, y_train, rng)
+                subsets.append(idx)
+            out.append((rows, subsets))
+    return out
 
 
 def per_estimator_subsets(method, X, y, budget, n_estimators, seed, task="classification", **kw) -> list[np.ndarray]:

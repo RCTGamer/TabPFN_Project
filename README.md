@@ -75,6 +75,23 @@ python -m tabpfn_lab.cli analyze --csv results/tables/scaling_dev.csv
   `context_steps.csv` (paired effect of doubling the context at fixed E) and `estimator_steps.csv` (next E at fixed
   context), with Holm-adjusted paired t-tests over seeds.
 
+### Per-estimator contexts (`configs/perest_dev.yaml`)
+
+Eight estimators, each with its own 1024-row context, on the dev datasets:
+
+```bash
+python -m tabpfn_lab.cli coreset --config configs/perest_dev.yaml
+python -m tabpfn_lab.cli analyze --csv results/tables/perest_dev.csv   # dev table: paired vs perest_random, Holm
+```
+
+- Baselines: `perest_random`, `perest_partition`, `builtin_subsample`, `perest_stratified`.
+- Global coverage: `perest_representative`, `perest_kcenter`.
+- Local: `local_mix_r<R>` for each R in `local_ratios`. The test rows are grouped by their features (never their
+  labels), and each group gets contexts with a share R of rows near it. These rows are flagged `transductive`.
+- Experts: `cluster_experts`, plus `cluster_experts+gate` with per-test-row estimator weights.
+- Coreset runs also write `<name>.timing.csv` (fit, predict and selection seconds, number of fits per cell), and
+  `analyze` adds the mean cost to the dev table.
+
 ### GPU server setup
 
 TabPFN 9.0.0 needs a one-time licence acceptance before it downloads weights. Log in at the Prior Labs portal, accept the licence, then `export TABPFN_TOKEN=<api key>`. For gated Hugging Face mirrors, run `hf auth login` or set `HF_TOKEN`. The backend raises a clear error naming these variables when the download is refused.
