@@ -54,6 +54,27 @@ What the runner gives you:
 - **Logs:** `results/logs/<name>.log` gets one line per cell, with wall time and peak GPU memory.
 - **Metadata:** `<name>.meta.json` holds the config, backend parameters, `tabpfn` version, the resolved inference config, test-split hashes, the expected grid, and the pre-registered Holm family for experiment B. The family is written before the first cell runs.
 
+### Scaling: context size x estimator count
+
+`cli scaling` fits random contexts of `budget_start`, x`budget_factor`, ... rows up to the whole training split
+(`full`), each with every count in `n_estimators`. Within a seed the contexts are nested, so a larger budget only adds
+rows. Each (seed, dataset, budget, E) is a separate fit, so its cost is measured alone.
+
+```bash
+python -m tabpfn_lab.cli scaling --config configs/scaling_smoke.yaml   # sklearn sanity run, seconds
+nohup python -m tabpfn_lab.cli scaling --config configs/scaling_dev.yaml > results/logs/scaling_dev.out 2>&1 &
+python -m tabpfn_lab.cli analyze --csv results/tables/scaling_dev.csv
+```
+
+- `<name>.csv`: metrics in the usual long format, bit-identical across runs with the sklearn backend.
+- `<name>.timing.csv`: one row per cell with `fit_seconds`, `predict_seconds`, `total_seconds`, `peak_gpu_mb`,
+  `device_name`, `hostname`, `n_train`, `n_test`. With `fit_mode: fit_preprocessors` the transformer runs inside
+  the prediction pass, so context size shows up in `predict_seconds`. `peak_gpu_mb` is
+  `torch.cuda.max_memory_allocated`, not the `nvidia-smi` figure.
+- `analyze` writes `<name>.analysis.summary.csv` (mean, se and cost per dataset, budget and E),
+  `context_steps.csv` (paired effect of doubling the context at fixed E) and `estimator_steps.csv` (next E at fixed
+  context), with Holm-adjusted paired t-tests over seeds.
+
 ### GPU server setup
 
 TabPFN 9.0.0 needs a one-time licence acceptance before it downloads weights. Log in at the Prior Labs portal, accept the licence, then `export TABPFN_TOKEN=<api key>`. For gated Hugging Face mirrors, run `hf auth login` or set `HF_TOKEN`. The backend raises a clear error naming these variables when the download is refused.

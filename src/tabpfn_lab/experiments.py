@@ -1,4 +1,5 @@
-"""Experiment runners: A (aggregation) and B (coresets), with caching, resume, sharding and failure logging.
+"""Experiment runners: A (aggregation), B (coresets) and scaling (context size x estimators), with caching, resume,
+sharding and failure logging.
 
 A run is a stable, ordered list of cells. Each cell is computed, its rows appended to the CSV, and skipped on
 rerun. Exceptions inside a cell are recorded in `<name>.failures.csv` and the sweep continues.
@@ -9,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import socket
+import subprocess
 import time
 import traceback
 from dataclasses import dataclass
@@ -23,6 +26,7 @@ from .backends import (
     Backend,
     ClfOutputs,
     RegOutputs,
+    gpu_name,
     gpu_peak_mb,
     is_oom_error,
     make_backend,
@@ -99,9 +103,9 @@ def normalize_config(cfg: dict, experiment: str) -> dict:
     c.setdefault("name", experiment)
     c.setdefault("backend", {"name": "sklearn"})
     c.setdefault("test_size", 0.3)
-    c.setdefault("n_estimators", 8)
+    c.setdefault("n_estimators", [1, 2, 4, 8] if experiment == "scaling" else 8)
     c.setdefault("aggregators", ["mean"])
-    c.setdefault("reg_aggregators", DEFAULT_REG_AGGREGATORS)
+    c.setdefault("reg_aggregators", ["mixture"] if experiment == "scaling" else DEFAULT_REG_AGGREGATORS)
     c.setdefault("aggregator_kwargs", {})
     c.setdefault("references", ["native", "native_tuned"])
     c.setdefault("cache_dir", "results/raw")
@@ -125,6 +129,11 @@ def normalize_config(cfg: dict, experiment: str) -> dict:
         c.setdefault("perest_mode", "single_fit")
         if c["perest_mode"] not in ("single_fit", "separate_fits"):
             raise ValueError(f"perest_mode must be single_fit or separate_fits, got {c['perest_mode']!r}")
+    if experiment == "scaling":
+        c.setdefault("budget_start", 512)
+        c.setdefault("budget_factor", 2)
+        c.setdefault("max_budget", None)
+        c.setdefault("warmup", True)
     c.setdefault("out_csv", f"results/tables/{c['name']}_{experiment}.csv")
     c["experiment"] = experiment
     return c
@@ -146,6 +155,10 @@ def failures_path(csv_path: Path) -> Path:
 
 def meta_path(csv_path: Path) -> Path:
     return csv_path.with_name(f"{csv_path.stem}.meta.json")
+
+
+def timing_path(csv_path: Path) -> Path:
+    return csv_path.with_name(f"{csv_path.stem}.timing.csv")
 
 
 def read_results(path) -> pd.DataFrame:
@@ -186,10 +199,12 @@ class Cell:
     method: str = ""
     budget: int | None = None
     budget_key: str = ""
+    n_estimators: int | None = None  # set only when the estimator count varies across cells (scaling)
 
     @property
     def id(self) -> str:
-        return f"{self.experiment}|{self.dataset}|s{self.split_seed}|r{self.seed}|{self.method}|{self.budget_key}|{self.budget}"
+        base = f"{self.experiment}|{self.dataset}|s{self.split_seed}|r{self.seed}|{self.method}|{self.budget_key}|{self.budget}"
+        return base if self.n_estimators is None else f"{base}|E{self.n_estimators}"
 
 
 def _key_overrides(overrides) -> dict:
@@ -214,6 +229,7 @@ class Context:
         self._splits: dict = {}
         self.backend_meta: dict = {}
         self.split_hashes: dict = {}
+        self.warmed: set[str] = set()
 
     def split(self, name: str, split_seed: int) -> Split:
         key = (name, split_seed)
@@ -659,6 +675,176 @@ def run_coreset(cfg: dict, backend: Backend | None = None, shard=None) -> Path:
         },
     }
     return _run_cells(cfg, ctx, cells, lambda c: _coreset_cell(cfg, ctx, c), shard, meta)
+
+
+# --------------------------------------------------------------------------- scaling: context size x estimators
+
+# one row per cell in <name>.timing.csv; kept out of the results CSV so that stays bit-identical across runs
+TIMING_COLUMNS = [
+    "cell", "dataset", "task", "split", "split_seed", "seed", "budget", "budget_key", "n_train", "n_test", "n_features",
+    "n_estimators", "fit_seconds", "predict_seconds", "total_seconds", "peak_gpu_mb", "device_name", "hostname",
+]
+
+
+def scaling_budgets(n_train, start=512, factor=2, max_budget=None) -> list[int]:
+    """start, start*factor, ... while below n_train (and max_budget), then n_train itself, the full context."""
+    if int(start) < 1 or float(factor) <= 1:
+        raise ValueError(f"need budget_start >= 1 and budget_factor > 1, got {start}, {factor}")
+    cap = int(n_train) if max_budget is None else min(int(n_train), int(max_budget))
+    out, b = [], int(start)
+    while b < cap:
+        out.append(b)
+        b = max(b + 1, round(b * float(factor)))
+    return out + [cap]
+
+
+def nested_random_subset(n_train, budget, seed) -> np.ndarray:
+    """Sorted first `budget` rows of one seeded permutation of the training split: within a seed, every smaller
+    context is contained in every larger one, so differences between budgets come from size, not from the draw."""
+    perm = np.random.default_rng([int(seed), 303]).permutation(int(n_train))
+    return np.sort(perm[: min(int(budget), int(n_train))])
+
+
+def scaling_cells(cfg, ctx: Context) -> tuple[list[Cell], dict]:
+    """Seed-major order: every finished seed is a complete replicate of the whole grid."""
+    grids = {}
+    for name in ctx.specs:
+        n = ctx.split(name, cfg["seeds"][0]).n_train
+        grids[name] = {"n_train": n, "budgets": scaling_budgets(n, cfg["budget_start"], cfg["budget_factor"], cfg["max_budget"])}
+    cells = []
+    for seed in cfg["seeds"]:
+        for name, g in grids.items():
+            for b in g["budgets"]:
+                key = "full" if b == g["n_train"] else f"a{b}"
+                for E in _n_estimators_list(cfg):
+                    cells.append(Cell("scaling", name, seed, seed, "random", b, key, n_estimators=E))
+    return cells, grids
+
+
+def _warm_up(ctx: Context, split: Split) -> None:
+    """One small untimed fit per task, so weight loading and CUDA start-up do not land in the first measured cell."""
+    if split.task in ctx.warmed:
+        return
+    ctx.warmed.add(split.task)
+    tr = nested_random_subset(split.n_train, 256, 0)
+    try:
+        if split.task == "classification":
+            ctx.backend.clf_outputs(split.X_train[tr], split.y_train[tr], split.X_test[:256], split.classes, 1, 0)
+        else:
+            ctx.backend.reg_outputs(split.X_train[tr], split.y_train[tr], split.X_test[:256], 1, 0)
+    except Exception as e:  # a failed warm-up only means the first cell's timing includes start-up
+        log.warning("warm-up for %s failed: %s: %s", split.task, type(e).__name__, e)
+
+
+def _scaling_cell(cfg, ctx: Context, cell: Cell, timing_csv: Path) -> list[dict]:
+    split = ctx.split(cell.dataset, cell.split_seed)
+    spec = ctx.specs[cell.dataset]
+    E, levels = cell.n_estimators, cfg["quantile_levels"]
+    if cfg["warmup"]:
+        _warm_up(ctx, split)
+    reset_gpu_peak()
+    idx = nested_random_subset(split.n_train, cell.budget, cell.seed)
+    X, y = split.X_train[idx], split.y_train[idx]
+    t0 = time.perf_counter()
+    if split.task == "classification":
+        out = ctx.backend.clf_outputs(X, y, split.X_test, split.classes, E, cell.seed)
+    else:
+        out = ctx.backend.reg_outputs(X, y, split.X_test, E, cell.seed)
+    total = time.perf_counter() - t0
+    if not ctx.backend_meta:
+        ctx.backend_meta = dict(out.meta)
+    rows = []
+    kw = lambda a: dict(cfg["aggregator_kwargs"].get(a, {}) or {})  # noqa: E731
+    if split.task == "classification":
+        for a in cfg["aggregators"]:
+            P = agg.aggregate_clf(a, out.logits, out.temperature, **kw(a))
+            role = "baseline" if a == "mean" else "method"
+            rows += _rows(cfg, cell, split, spec, ctx.backend.name, a, _score(split, P, levels), role, cell.budget, cell.budget_key, E)
+    else:
+        for a in cfg["reg_aggregators"]:
+            pred = agg.aggregate_reg(a, out.probs, out.dist, levels, **kw(a))
+            role = "baseline" if a == "mixture" else "method"
+            rows += _rows(cfg, cell, split, spec, ctx.backend.name, a, _score(split, pred, levels), role, cell.budget, cell.budget_key, E)
+    t = out.meta.get("timing", {})
+    timing = {
+        "cell": cell.id,
+        "dataset": split.name,
+        "task": split.task,
+        "split": spec.get("split", "dev"),
+        "split_seed": int(cell.split_seed),
+        "seed": int(cell.seed),
+        "budget": int(cell.budget),
+        "budget_key": cell.budget_key,
+        "n_train": int(split.n_train),
+        "n_test": int(split.n_test),
+        "n_features": int(X.shape[1]),
+        "n_estimators": int(E),
+        "fit_seconds": t.get("fit_seconds", float("nan")),
+        "predict_seconds": t.get("predict_seconds", float("nan")),
+        "total_seconds": total,
+        "peak_gpu_mb": gpu_peak_mb(),
+        "device_name": out.meta.get("device_name", "") or gpu_name() or "cpu",
+        "hostname": socket.gethostname(),
+    }
+    # written before the results rows: a crash in between leaves a timing row whose cell reruns (read_timing keeps the last)
+    timing_csv.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([timing], columns=TIMING_COLUMNS).to_csv(timing_csv, mode="a", header=not timing_csv.exists(), index=False)
+    return rows
+
+
+def read_timing(path) -> pd.DataFrame:
+    df = pd.read_csv(path, dtype={"cell": str, "dataset": str, "budget_key": str, "device_name": str, "hostname": str})
+    return df.drop_duplicates("cell", keep="last").reset_index(drop=True)
+
+
+def validate_timing(results: pd.DataFrame, timing: pd.DataFrame | None) -> list[str]:
+    """Every results cell has one timing row with finite, non-negative times."""
+    if timing is None:
+        return ["timing file missing"]
+    problems = []
+    gone = sorted(set(results["cell"]) - set(timing["cell"]))
+    if gone:
+        problems.append(f"{len(gone)} cells have no timing row (e.g. {gone[:3]})")
+    for col in ("fit_seconds", "predict_seconds", "total_seconds"):
+        v = pd.to_numeric(timing[col], errors="coerce").to_numpy(dtype=float)
+        if (~np.isfinite(v)).any() or (v < 0).any():
+            problems.append(f"timing column {col!r} has NaN/inf/negative values")
+    return problems
+
+
+def _git_commit() -> str | None:
+    try:
+        out = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, timeout=10, check=False, cwd=Path(__file__).parent)
+        return out.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def run_scaling(cfg: dict, backend: Backend | None = None, shard=None) -> Path:
+    """Random nested contexts of budget_start, x budget_factor, ... up to all training rows, crossed with every
+    estimator count; each (seed, dataset, budget, E) is its own fit so its time and memory are measured alone."""
+    cfg = normalize_config(cfg, "scaling")
+    ctx = Context(cfg, backend)
+    cells, grids = scaling_cells(cfg, ctx)
+    timing_csv = timing_path(shard_path(cfg["out_csv"], shard))
+    methods = {"classification": list(cfg["aggregators"]), "regression": list(cfg["reg_aggregators"])}
+    meta = {
+        "experiment": "scaling",
+        "config": cfg,
+        "backend": ctx.backend.params(),
+        "tabpfn_version": _tabpfn_version_meta(ctx.backend),
+        "grids": grids,
+        "hostname": socket.gethostname(),
+        "git_commit": _git_commit(),
+        "timing_csv": str(timing_csv),
+        "expected": {
+            "datasets": {n: d.get("task", "classification") for n, d in ctx.specs.items()},
+            "methods": methods,
+            "seeds": cfg["seeds"],
+            "budgets": {n: g["budgets"] for n, g in grids.items()},
+        },
+    }
+    return _run_cells(cfg, ctx, cells, lambda c: _scaling_cell(cfg, ctx, c, timing_csv), shard, meta)
 
 
 # --------------------------------------------------------------------------- tuning (dev datasets only)

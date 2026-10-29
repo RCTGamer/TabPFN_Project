@@ -1,0 +1,27 @@
+# Scaling: more context vs more estimators. Random nested contexts of 512, 1024, 2048, ... rows up to all training
+# rows, each crossed with 1, 2, 4 and 8 estimators; every (seed, dataset, budget, E) is its own timed fit.
+#   python -m tabpfn_lab.cli scaling --config configs/scaling_dev.yaml
+#   python -m tabpfn_lab.cli analyze --csv results/tables/scaling_dev.csv
+# Results: results/tables/scaling_dev.csv (metrics), scaling_dev.timing.csv (fit/predict seconds, peak GPU MB,
+# GPU name, host), scaling_dev.meta.json, scaling_dev.failures.csv (e.g. OOM at large contexts).
+name: scaling_dev
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: phoneme, source: openml, data_id: 1489, task: classification}       # n_train ~3.8k
+    - {name: houses, source: openml, data_id: 537, task: regression}             # n_train ~14k
+    - {name: electricity, source: openml, data_id: 151, task: classification}    # n_train ~32k
+    - {name: higgs, source: openml, data_id: 23512, task: classification}        # n_train ~69k
+  confirm: []
+seeds: [0, 1, 2, 3, 4]          # split, context draw and model seed; add more later, finished cells are kept
+test_size: 0.3
+budget_start: 512
+budget_factor: 2
+max_budget: null                # e.g. 32768 to skip the largest contexts
+n_estimators: [1, 2, 4, 8]
+aggregators: [mean]             # tabpfn's own rule (classification)
+reg_aggregators: [mixture]      # tabpfn's own rule (regression)
+warmup: true                    # one untimed small fit per task before the first measured cell
+cache_dir: null                 # no per-estimator output cache: every cell is a fresh, timed fit
+log_dir: results/logs
+out_csv: results/tables/scaling_dev.csv
