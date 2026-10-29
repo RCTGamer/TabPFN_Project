@@ -5,6 +5,7 @@ from tabpfn_lab import aggregation as A
 from tabpfn_lab import cli, experiments
 from tabpfn_lab import coresets as cs
 from tabpfn_lab.experiments import (
+    is_transductive,
     local_ratio,
     read_results,
     read_timing,
@@ -127,7 +128,7 @@ def _cfg(tmp_path, methods, **kw):
     return cfg
 
 
-METHODS = ["perest_random", "perest_partition", "builtin_subsample", "perest_stratified", "perest_representative", "perest_kcenter", "local_mix", "cluster_experts"]
+METHODS = ["perest_random", "perest_partition", "builtin_subsample", "perest_stratified", "perest_representative", "perest_kcenter", "local_mix", "cluster_experts", "crumb", "crumb_perest"]
 
 
 def test_perest_run_flags_timing_analysis_and_determinism(tmp_path):
@@ -135,12 +136,13 @@ def test_perest_run_flags_timing_analysis_and_determinism(tmp_path):
     assert cli.validate_csv(csv) == []
     df = read_results(csv)
     have = set(df["method"])
-    assert {"local_mix_r0.5", "local_mix_r1", "cluster_experts+gate", "full"} <= have
-    loc = df["method"].map(local_ratio).notna()
+    assert {"local_mix_r0.5", "local_mix_r1", "cluster_experts+gate", "crumb", "crumb_perest", "full"} <= have
+    loc = df["method"].map(is_transductive)
     assert (df.loc[loc, "flags"] == "transductive").all() and (df.loc[~loc, "flags"] == "").all()
     t = read_timing(timing_path(csv))
     assert set(t["cell"]) == set(df["cell"])
-    assert (t.loc[t["method"] == "local_mix_r0.5", "n_fits"] == 3).all()  # one fit per test group
+    for m in ("local_mix_r0.5", "crumb", "crumb_perest"):
+        assert (t.loc[t["method"] == m, "n_fits"] == 3).all()  # one fit per test group
     assert (t.loc[t["method"] == "perest_random", "n_fits"] == 1).all()
     assert (t[["fit_seconds", "predict_seconds", "selection_seconds"]] >= 0).all().all()
     dev = cli.analyze(csv)["dev"]
@@ -171,3 +173,54 @@ def test_local_mix_expands_from_ratios():
     assert cfg["coreset_methods"] == ["random", "local_mix_r0.9", "local_mix_r1"]
     assert experiments.normalize_config(cfg, "coreset")["coreset_methods"] == cfg["coreset_methods"]
     assert local_ratio("local_mix_r0.75+median") == 0.75 and local_ratio("perest_random") is None
+
+
+def _mmd2(A_, B_, gamma):
+    k = lambda P, Q: np.exp(-gamma * ((P[:, None, :] - Q[None, :, :]) ** 2).sum(-1)).mean()  # noqa: E731
+    return k(A_, A_) + k(B_, B_) - 2 * k(A_, B_)
+
+
+def test_kernel_herding_matches_target_better_than_random():
+    rng = np.random.default_rng(0)
+    F = np.vstack([rng.normal(0, 1, (900, 2)), rng.normal(4, 0.5, (100, 2))])
+    target = rng.normal(4, 0.5, (200, 2))  # the small blob only
+    gamma = 0.5
+    idx = cs.kernel_herding(F, cs.kernel_mean(F, target, gamma), 40, gamma)
+    assert len(idx) == 40 and len(np.unique(idx)) == 40
+    np.testing.assert_array_equal(idx, cs.kernel_herding(F, cs.kernel_mean(F, target, gamma), 40, gamma))
+    rand = rng.choice(len(F), 40, replace=False)
+    assert _mmd2(F[idx], target, gamma) < 0.2 * _mmd2(F[rand], target, gamma)
+    assert (idx >= 900).mean() > 0.9
+
+
+@pytest.mark.parametrize("task", ["classification", "regression"])
+def test_crumb_routing(task):
+    X, y = make_synthetic(900, 5, n_classes=3, task=task, seed=3)
+    Xtr, ytr, Xte = X[:600], y[:600], X[600:]
+    faithful = cs.ROUTED_METHODS["crumb"](Xtr, ytr, Xte, 50, 4, 1, task, n_groups=4)
+    perest = cs.ROUTED_METHODS["crumb_perest"](Xtr, ytr, Xte, 50, 4, 1, task, n_groups=4)
+    local = cs.local_mix_routing(Xtr, ytr, Xte, 50, 4, 1, task, 0.9, n_groups=4)
+    assert [r.tolist() for r, _ in faithful] == [r.tolist() for r, _ in perest] == [r.tolist() for r, _ in local]
+    assert sorted(np.concatenate([r for r, _ in faithful]).tolist()) == list(range(len(Xte)))
+    for (_, a), (_, b) in zip(faithful, perest):
+        assert all(np.array_equal(a[0], s) for s in a)  # one shared herded context
+        assert len({tuple(sorted(s.tolist())) for s in b}) == 4  # a different one per estimator
+        for s in a + b:
+            assert len(s) == 50 and len(np.unique(s)) == 50 and s.max() < len(Xtr)
+            if task == "classification":
+                assert set(np.unique(ytr[s])) == {0, 1, 2}
+
+
+def test_crumb_never_sees_test_labels(tmp_path, monkeypatch):
+    seen = []
+    real = experiments.cs.ROUTED_METHODS["crumb"]
+
+    def spy(X_train, y_train, X_test, *a, **kw):
+        seen.append((len(X_train), len(y_train), len(X_test)))
+        return real(X_train, y_train, X_test, *a, **kw)
+
+    monkeypatch.setitem(experiments.cs.ROUTED_METHODS, "crumb", spy)
+    cfg = _cfg(tmp_path, ["perest_random", "crumb"], datasets={"dev": [_cfg(tmp_path, [])["datasets"]["dev"][0]], "confirm": []})
+    run_coreset(cfg)
+    split = experiments.Context(experiments.normalize_config(cfg, "coreset"), None).split("clf", 0)
+    assert seen and all(s == (split.n_train, split.n_train, split.n_test) for s in seen)

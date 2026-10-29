@@ -59,6 +59,11 @@ TRANSDUCTIVE = "transductive"
 GATED = {"cluster_experts"}  # per-estimator methods that also get a `+gate` row (per-test-row estimator weights)
 
 
+def is_transductive(method: str) -> bool:
+    """Methods (and their `+aggregator` rows) whose contexts depend on the test batch's features."""
+    return local_ratio(method) is not None or method.split("+")[0] in cs.ROUTED_METHODS
+
+
 def local_ratio(method: str) -> float | None:
     """The local share of a `local_mix_r<ratio>` method (also of its `+aggregator` rows), else None."""
     if not method.startswith(LOCAL_PREFIX):
@@ -541,7 +546,7 @@ def coreset_methods_by_task(cfg) -> dict[str, list[str]]:
                 ms.append(f"{m}_corrected")
             if m in GATED:
                 ms.append(f"{m}+gate")
-            if m in cs.PER_ESTIMATOR_METHODS or local_ratio(m) is not None:
+            if m in cs.PER_ESTIMATOR_METHODS or is_transductive(m):
                 ms += [f"{m}+{a}" for a in cfg["combined_aggregators"]]
         out[task] = ["full", *ms] if "full" not in ms else ms
     return out
@@ -603,15 +608,14 @@ def _stack_outputs(outs: list, task):
     return RegOutputs(np.concatenate(probs), ref, outs[0].y_mean, outs[0].y_std, outs[0].meta)
 
 
-def _local_outputs(cfg, ctx: Context, split: Split, ratio: float, budget: int, E: int, seed: int):
-    """One E-estimator fit per test-feature group, each on its own per-estimator contexts and evaluated on that
-    group's test rows only; the outputs are put back into test-row order."""
+def _local_outputs(cfg, ctx: Context, split: Split, groups, tag: str, E: int, seed: int):
+    """One E-estimator fit per test-feature group (from a routing function: [(test_rows, subsets)]), each on its own
+    per-estimator contexts and evaluated on that group's test rows only; outputs are put back into test-row order."""
     X, y = split.X_train, split.y_train
-    groups = cs.local_mix_routing(X, y, split.X_test, budget, E, seed, split.task, ratio, n_groups=cfg["local_groups"])
     parts = []
     for g, (rows, subsets) in enumerate(groups):
-        tag = f"{LOCAL_PREFIX}{ratio:g}:{budget}:G{cfg['local_groups']}:g{g}"
-        o = ctx.outputs(split, X, y, E, seed, tag, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]}, X_eval=split.X_test[rows])
+        tag_g = f"{tag}:G{cfg['local_groups']}:g{g}"
+        o = ctx.outputs(split, X, y, E, seed, tag_g, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]}, X_eval=split.X_test[rows])
         parts.append((rows, o))
     first = parts[0][1]
     if split.task == "classification":
@@ -649,7 +653,12 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
         overrides = {"SUBSAMPLE_SAMPLES": int(budget), "SAMPLE_SUBSAMPLING_METHOD": sampler}
         out = ctx.outputs(split, X, y, E, seed, f"{method}:{budget}", overrides=overrides)
     elif local_ratio(method) is not None:
-        out = _local_outputs(cfg, ctx, split, local_ratio(method), budget, E, seed)
+        r = local_ratio(method)
+        groups = cs.local_mix_routing(X, y, split.X_test, budget, E, seed, task, r, n_groups=cfg["local_groups"])
+        out = _local_outputs(cfg, ctx, split, groups, f"{LOCAL_PREFIX}{r:g}:{budget}", E, seed)
+    elif method in cs.ROUTED_METHODS:
+        groups = cs.ROUTED_METHODS[method](X, y, split.X_test, budget, E, seed, task, n_groups=cfg["local_groups"])
+        out = _local_outputs(cfg, ctx, split, groups, f"{method}:{budget}", E, seed)
     elif method in cs.PER_ESTIMATOR_METHODS:
         subsets = cs.per_estimator_subsets(method, X, y, budget, E, seed, task, **kw)
         tag = f"{method}:{budget}" + (f":{json.dumps(kw, sort_keys=True)}" if kw else "")
@@ -690,7 +699,7 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
         else:
             Pg = agg.agg_sample_weighted_mixture(out.probs, out.dist, levels, w=w)
         results.append((f"{method}+gate", _score(split, Pg, levels), "method"))
-    if method in cs.PER_ESTIMATOR_METHODS or local_ratio(method) is not None:
+    if method in cs.PER_ESTIMATOR_METHODS or is_transductive(method):
         for a in cfg["combined_aggregators"]:
             if task == "classification":
                 Pa = agg.aggregate_clf(a, out.logits, out.temperature, **(cfg["aggregator_kwargs"].get(a, {}) or {}))
@@ -710,7 +719,7 @@ def _coreset_cell(cfg, ctx: Context, cell: Cell) -> list[dict]:
     total = time.perf_counter() - t0
     rows = []
     for method, metrics, role in results:
-        flags = TRANSDUCTIVE if local_ratio(method) is not None else ""
+        flags = TRANSDUCTIVE if is_transductive(method) else ""
         rows += _rows(cfg, cell, split, spec, ctx.backend.name, method, metrics, role, budget=cell.budget, budget_key=cell.budget_key, n_estimators=E, flags=flags)
     if ctx.timing_csv is not None:
         c = ctx.cost

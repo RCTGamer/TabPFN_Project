@@ -1,0 +1,31 @@
+# CRUMB (Heredge et al., arXiv 2606.11473) next to the perest_dev run: same datasets, seeds and 8 x 1024 budget.
+# Kept separate so an in-progress perest_dev run is not extended; compare the two tables side by side
+# (perest_random is in both, as the shared baseline).
+#   python -m tabpfn_lab.cli coreset --config configs/perest_crumb.yaml
+#   python -m tabpfn_lab.cli analyze --csv results/tables/perest_crumb.csv
+# crumb: k-means of the test features into local_groups groups, one kernel-herded 1024-row context per group shared
+#   by all 8 estimators. crumb_perest: each estimator herds from its own random 70% of the training rows.
+# Both are transductive (contexts depend on the test batch's features, never its labels).
+name: perest_crumb
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}
+    - {name: houses, source: openml, data_id: 537, task: regression}
+    - {name: phoneme, source: openml, data_id: 1489, task: classification}
+  confirm: []
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: []
+budget_absolute: [1024]
+coreset_methods: [perest_random, crumb, crumb_perest]
+local_groups: 8
+perest_mode: single_fit
+baseline: perest_random
+combined_aggregators: []
+split_seeds: 3
+selection_seeds: 3
+cache_dir: null
+log_dir: results/logs
+out_csv: results/tables/perest_crumb.csv
