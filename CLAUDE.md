@@ -2,7 +2,9 @@
 
 - Spec: `PROJECT_SPEC.md` is the source of truth; build order is its section 8.
 - **Never import `tabpfn` (or `torch`) outside `src/tabpfn_lab/backends.py`.** Experiments talk to the `Backend` interface only.
-- Anything that selects rows or fits weights sees the training split only. Tests enforce this.
+- Anything that selects rows or fits weights sees training labels only: test features may be used at prediction time
+  (routing, gating, `local_mix`), test labels never. Methods whose prediction for a row depends on other test rows
+  carry `flags = "transductive"`. Tests enforce this.
 - Everything is seeded; same config + seed must give bit-identical CSVs with the sklearn backend.
 - Results are long-format with the schema in `validate.py`; run `validate_results` on anything you produce.
 - New aggregator = one function + one line in `CLF_AGGREGATORS`/`REG_AGGREGATORS`. New coreset = one function + one line in `CORESET_METHODS`.

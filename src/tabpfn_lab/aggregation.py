@@ -82,6 +82,22 @@ def agg_weighted(logits, temperature, w=None, **_):
     return _renorm(np.tensordot(w, P, axes=1))
 
 
+def _row_weights(w, E, n):
+    if w is None:
+        raise ValueError("aggregator 'sample_weighted' needs per-row estimator weights w of shape (E, n)")
+    w = np.asarray(w, np.float64)
+    if w.shape != (E, n) or (w < 0).any():
+        raise ValueError(f"per-row weights must be non-negative with shape ({E}, {n}), got {w.shape}")
+    return w / w.sum(axis=0, keepdims=True)
+
+
+def agg_sample_weighted(logits, temperature, w=None, **_):
+    """Per-test-row estimator weights w (E, n), e.g. a gate that favours the estimator whose context is closest.
+    Not in CLF_AGGREGATORS: the weights depend on the test rows, so only a runner that computes them can call it."""
+    P = per_estimator_proba(logits, temperature)
+    return _renorm((_row_weights(w, P.shape[0], P.shape[1])[..., None] * P).sum(axis=0))
+
+
 def estimator_log_losses(val_logits, val_y, temperature):
     P = per_estimator_proba(val_logits, temperature)
     y = np.asarray(val_y, int)
@@ -174,6 +190,14 @@ def _from_logp(logp, dist, levels):
 def agg_mixture(probs, dist, levels=DEFAULT_LEVELS, **_):
     with np.errstate(divide="ignore"):
         logp = np.log(np.asarray(probs, np.float64).mean(axis=0))
+    return _from_logp(logp, dist, levels)
+
+
+def agg_sample_weighted_mixture(probs, dist, levels=DEFAULT_LEVELS, w=None, **_):
+    """`mixture` with per-test-row estimator weights w (E, n); like `agg_sample_weighted`, not in REG_AGGREGATORS."""
+    probs = np.asarray(probs, np.float64)
+    with np.errstate(divide="ignore"):
+        logp = np.log((_row_weights(w, probs.shape[0], probs.shape[1])[..., None] * probs).sum(axis=0))
     return _from_logp(logp, dist, levels)
 
 

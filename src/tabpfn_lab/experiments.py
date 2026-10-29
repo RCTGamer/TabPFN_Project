@@ -53,6 +53,17 @@ CANARY = "canary_shuffled"
 REFERENCE_METHODS_B = {"full", "random", CANARY, *BUILTIN_METHODS}
 REQUIRED_BASELINES_B = ["full", "random", "builtin_subsample", "builtin_majority_downsample"]
 DEFAULT_REG_AGGREGATORS = ["mixture", "log_pool", "quantile_mean", "quantile_median"]
+# `local_mix` in a config expands to local_mix_r<ratio> per `local_ratios`; contexts are built per test-feature group
+LOCAL_PREFIX = "local_mix_r"
+TRANSDUCTIVE = "transductive"
+GATED = {"cluster_experts"}  # per-estimator methods that also get a `+gate` row (per-test-row estimator weights)
+
+
+def local_ratio(method: str) -> float | None:
+    """The local share of a `local_mix_r<ratio>` method (also of its `+aggregator` rows), else None."""
+    if not method.startswith(LOCAL_PREFIX):
+        return None
+    return float(method[len(LOCAL_PREFIX) :].split("+")[0])
 
 
 class TuningOnConfirmError(ValueError):
@@ -129,6 +140,9 @@ def normalize_config(cfg: dict, experiment: str) -> dict:
         c.setdefault("perest_mode", "single_fit")
         if c["perest_mode"] not in ("single_fit", "separate_fits"):
             raise ValueError(f"perest_mode must be single_fit or separate_fits, got {c['perest_mode']!r}")
+        c.setdefault("local_ratios", [0.5, 0.75, 0.9, 1.0])
+        c.setdefault("local_groups", 8)
+        c["coreset_methods"] = [x for m in c["coreset_methods"] for x in ([f"{LOCAL_PREFIX}{float(r):g}" for r in c["local_ratios"]] if m == "local_mix" else [m])]
     if experiment == "scaling":
         c.setdefault("budget_start", 512)
         c.setdefault("budget_factor", 2)
@@ -230,6 +244,8 @@ class Context:
         self.backend_meta: dict = {}
         self.split_hashes: dict = {}
         self.warmed: set[str] = set()
+        self.timing_csv: Path | None = None
+        self.cost = {"fit_seconds": 0.0, "predict_seconds": 0.0, "n_fits": 0}  # backend fits since the cell started
 
     def split(self, name: str, split_seed: int) -> Split:
         key = (name, split_seed)
@@ -265,6 +281,10 @@ class Context:
                 o = self.backend.reg_outputs(X, y, X_eval, n_estimators, seed, overrides=overrides)
             if not self.backend_meta:
                 self.backend_meta = dict(o.meta)
+            t = o.meta.get("timing", {})
+            self.cost["fit_seconds"] += t.get("fit_seconds", 0.0)
+            self.cost["predict_seconds"] += t.get("predict_seconds", 0.0)
+            self.cost["n_fits"] += 1
             return o, o.meta
 
         cls = ClfOutputs if split.task == "classification" else RegOutputs
@@ -297,7 +317,7 @@ class Context:
         return out, split.y_train[va]
 
 
-def _rows(cfg, cell: Cell, split: Split, spec, backend_name, method, metrics: dict, role, budget=None, budget_key="", n_estimators=None):
+def _rows(cfg, cell: Cell, split: Split, spec, backend_name, method, metrics: dict, role, budget=None, budget_key="", n_estimators=None, flags=""):
     n_train = split.n_train
     return [
         {
@@ -315,7 +335,7 @@ def _rows(cfg, cell: Cell, split: Split, spec, backend_name, method, metrics: di
             "value": float(value),
             "backend": backend_name,
             "role": role,
-            "flags": "",
+            "flags": flags,
             "split_seed": int(cell.split_seed),
             "n_estimators": int(n_estimators if n_estimators is not None else -1),
             "budget_key": budget_key,
@@ -519,7 +539,9 @@ def coreset_methods_by_task(cfg) -> dict[str, list[str]]:
             ms.append(m)
             if m in cs.PRIOR_SHIFTING and task == "classification":
                 ms.append(f"{m}_corrected")
-            if m in cs.PER_ESTIMATOR_METHODS:
+            if m in GATED:
+                ms.append(f"{m}+gate")
+            if m in cs.PER_ESTIMATOR_METHODS or local_ratio(m) is not None:
                 ms += [f"{m}+{a}" for a in cfg["combined_aggregators"]]
         out[task] = ["full", *ms] if "full" not in ms else ms
     return out
@@ -581,8 +603,33 @@ def _stack_outputs(outs: list, task):
     return RegOutputs(np.concatenate(probs), ref, outs[0].y_mean, outs[0].y_std, outs[0].meta)
 
 
+def _local_outputs(cfg, ctx: Context, split: Split, ratio: float, budget: int, E: int, seed: int):
+    """One E-estimator fit per test-feature group, each on its own per-estimator contexts and evaluated on that
+    group's test rows only; the outputs are put back into test-row order."""
+    X, y = split.X_train, split.y_train
+    groups = cs.local_mix_routing(X, y, split.X_test, budget, E, seed, split.task, ratio, n_groups=cfg["local_groups"])
+    parts = []
+    for g, (rows, subsets) in enumerate(groups):
+        tag = f"{LOCAL_PREFIX}{ratio:g}:{budget}:G{cfg['local_groups']}:g{g}"
+        o = ctx.outputs(split, X, y, E, seed, tag, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]}, X_eval=split.X_test[rows])
+        parts.append((rows, o))
+    first = parts[0][1]
+    if split.task == "classification":
+        logits = np.empty((E, split.n_test, first.logits.shape[2]))
+        for rows, o in parts:
+            logits[:, rows] = o.logits
+        return ClfOutputs(logits, first.temperature, first.classes, first.meta)
+    ref = first.dist
+    probs = np.empty((E, split.n_test, ref.n_bins))
+    for rows, o in parts:
+        same = np.array_equal(o.dist.borders, ref.borders)
+        probs[:, rows] = o.probs if same else translate_probs(o.probs, o.dist.borders, ref.borders)
+    return RegOutputs(probs, ref, first.y_mean, first.y_std, first.meta)
+
+
 def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, seed: int, kwargs=None):
-    """Select from the training split only, fit the backend, aggregate, score on the untouched test split.
+    """Select from the training split (local methods also group the test features, never test labels), fit the
+    backend, aggregate, score on the untouched test labels.
 
     Returns a list of (method_name, metrics, role).
     """
@@ -601,6 +648,8 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
             raise ValueError(f"backend does not offer SAMPLE_SUBSAMPLING_METHOD={sampler!r}: {ctx.backend.subsample_methods()}")
         overrides = {"SUBSAMPLE_SAMPLES": int(budget), "SAMPLE_SUBSAMPLING_METHOD": sampler}
         out = ctx.outputs(split, X, y, E, seed, f"{method}:{budget}", overrides=overrides)
+    elif local_ratio(method) is not None:
+        out = _local_outputs(cfg, ctx, split, local_ratio(method), budget, E, seed)
     elif method in cs.PER_ESTIMATOR_METHODS:
         subsets = cs.per_estimator_subsets(method, X, y, budget, E, seed, task, **kw)
         tag = f"{method}:{budget}" + (f":{json.dumps(kw, sort_keys=True)}" if kw else "")
@@ -634,7 +683,14 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
         C = split.n_classes
         Pc = cs.prior_correct(P, cs.class_prior(y[idx], C), cs.class_prior(y, C))
         results.append((f"{method}_corrected", _score(split, Pc, levels), "method"))
-    if method in cs.PER_ESTIMATOR_METHODS:
+    if method in GATED:
+        w = cs.cluster_gate(X, split.X_test, E, seed)  # test features only
+        if task == "classification":
+            Pg = agg.agg_sample_weighted(out.logits, out.temperature, w=w)
+        else:
+            Pg = agg.agg_sample_weighted_mixture(out.probs, out.dist, levels, w=w)
+        results.append((f"{method}+gate", _score(split, Pg, levels), "method"))
+    if method in cs.PER_ESTIMATOR_METHODS or local_ratio(method) is not None:
         for a in cfg["combined_aggregators"]:
             if task == "classification":
                 Pa = agg.aggregate_clf(a, out.logits, out.temperature, **(cfg["aggregator_kwargs"].get(a, {}) or {}))
@@ -648,15 +704,33 @@ def _coreset_cell(cfg, ctx: Context, cell: Cell) -> list[dict]:
     split = ctx.split(cell.dataset, cell.split_seed)
     spec = ctx.specs[cell.dataset]
     E = max(_n_estimators_list(cfg))
+    ctx.cost = {"fit_seconds": 0.0, "predict_seconds": 0.0, "n_fits": 0}
+    t0 = time.perf_counter()
+    results = evaluate_coreset(cfg, ctx, split, cell.method, cell.budget, cell.seed)
+    total = time.perf_counter() - t0
     rows = []
-    for method, metrics, role in evaluate_coreset(cfg, ctx, split, cell.method, cell.budget, cell.seed):
-        rows += _rows(cfg, cell, split, spec, ctx.backend.name, method, metrics, role, budget=cell.budget, budget_key=cell.budget_key, n_estimators=E)
+    for method, metrics, role in results:
+        flags = TRANSDUCTIVE if local_ratio(method) is not None else ""
+        rows += _rows(cfg, cell, split, spec, ctx.backend.name, method, metrics, role, budget=cell.budget, budget_key=cell.budget_key, n_estimators=E, flags=flags)
+    if ctx.timing_csv is not None:
+        c = ctx.cost
+        timing = {
+            "cell": cell.id, "dataset": split.name, "task": split.task, "split": spec.get("split", "dev"),
+            "split_seed": int(cell.split_seed), "seed": int(cell.seed), "budget": int(cell.budget), "budget_key": cell.budget_key,
+            "n_train": int(split.n_train), "n_test": int(split.n_test), "n_features": int(split.X_train.shape[1]), "n_estimators": int(E),
+            "fit_seconds": c["fit_seconds"], "predict_seconds": c["predict_seconds"], "total_seconds": total,
+            "peak_gpu_mb": gpu_peak_mb(), "device_name": gpu_name() or "cpu", "hostname": socket.gethostname(),
+            "method": cell.method, "n_fits": c["n_fits"], "selection_seconds": max(0.0, total - c["fit_seconds"] - c["predict_seconds"]),
+        }
+        ctx.timing_csv.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame([timing], columns=CORESET_TIMING_COLUMNS).to_csv(ctx.timing_csv, mode="a", header=not ctx.timing_csv.exists(), index=False)
     return rows
 
 
 def run_coreset(cfg: dict, backend: Backend | None = None, shard=None) -> Path:
     cfg = normalize_config(cfg, "coreset")
     ctx = Context(cfg, backend)
+    ctx.timing_csv = timing_path(shard_path(cfg["out_csv"], shard))
     cells, grids = coreset_cells(cfg, ctx)
     family = coreset_family(cfg, ctx)  # written before any cell runs; `analyze` uses exactly this list
     meta = {
@@ -684,6 +758,8 @@ TIMING_COLUMNS = [
     "cell", "dataset", "task", "split", "split_seed", "seed", "budget", "budget_key", "n_train", "n_test", "n_features",
     "n_estimators", "fit_seconds", "predict_seconds", "total_seconds", "peak_gpu_mb", "device_name", "hostname",
 ]
+# coreset cells: fit/predict summed over the cell's backend fits (0 fits = served from the cache); selection is the rest
+CORESET_TIMING_COLUMNS = [*TIMING_COLUMNS, "method", "n_fits", "selection_seconds"]
 
 
 def scaling_budgets(n_train, start=512, factor=2, max_budget=None) -> list[int]:
