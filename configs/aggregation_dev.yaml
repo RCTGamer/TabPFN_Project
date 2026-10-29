@@ -1,0 +1,17 @@
+name: aggregation_dev
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: credit-g, source: openml, data_id: 31, task: classification}
+    - {name: phoneme, source: openml, data_id: 1489, task: classification}
+    - {name: houses, source: openml, data_id: 537, task: regression}
+  confirm: []
+seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+test_size: 0.3
+n_estimators: [1, 2, 4, 8]      # one 8-estimator fit; E = its first E estimators
+aggregators: [mean]             # TabPFN's classification rule
+reg_aggregators: [mixture]      # TabPFN's regression rule
+references: [native]            # package's own predict with E estimators, as a check
+cache_dir: results/raw
+log_dir: results/logs
+out_csv: results/tables/aggregation_dev.csv
