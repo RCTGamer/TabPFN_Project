@@ -8,6 +8,7 @@ Expensive internals are capped by `budget`/`pilot`/`max_clusters`, never by n, s
 from __future__ import annotations
 
 import warnings
+from functools import partial
 
 import numpy as np
 from threadpoolctl import threadpool_limits
@@ -477,6 +478,21 @@ PER_ESTIMATOR_METHODS = {
 # --------------------------------------------------------------------------- local contexts (routed by test features)
 
 
+def _test_groups(X_train, X_test, seed, n_groups):
+    """k-means of the test rows (features only) in the train-fitted feature space: (F_train, F_test, labels, centres)."""
+    from sklearn.cluster import KMeans
+
+    T = feature_transform(X_train, seed)
+    Ftr, Fte = T(X_train), T(X_test)
+    m = len(Fte)
+    G = int(max(1, min(n_groups, m)))
+    fit_rows = np.random.default_rng([int(seed), 505]).choice(m, min(m, KMEANS_FIT_ROWS), replace=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        km = KMeans(n_clusters=min(G, len(fit_rows)), n_init=3, random_state=int(seed)).fit(Fte[fit_rows])
+    return Ftr, Fte, km.predict(Fte), km.cluster_centers_
+
+
 def local_mix_routing(X_train, y_train, X_test, budget, n_estimators, seed, task="classification", ratio=0.9, n_groups=8, pool_factor=2):
     """Group the test rows by their features (k-means, never labels) and build, per group and estimator, a context of
     round(ratio * budget) rows drawn from the pool_factor-times-larger set of training rows nearest the group centre
@@ -484,29 +500,20 @@ def local_mix_routing(X_train, y_train, X_test, budget, n_estimators, seed, task
 
     The contexts depend on the whole test batch, so results built on this are transductive.
     """
-    from sklearn.cluster import KMeans
-
     if not 0 <= ratio <= 1:
         raise ValueError(f"ratio must be in [0, 1], got {ratio}")
     _check_budget(budget)
-    n, m = len(X_train), len(X_test)
+    n = len(X_train)
     with threadpool_limits(limits=1):
-        T = feature_transform(X_train, seed)
-        Ftr, Fte = T(X_train), T(X_test)
-        G = int(max(1, min(n_groups, m)))
-        fit_rows = np.random.default_rng([int(seed), 505]).choice(m, min(m, KMEANS_FIT_ROWS), replace=False)
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            km = KMeans(n_clusters=min(G, len(fit_rows)), n_init=3, random_state=int(seed)).fit(Fte[fit_rows])
-        labels = km.predict(Fte)
+        Ftr, _, labels, centres = _test_groups(X_train, X_test, seed, n_groups)
         b = min(int(budget), n)
         n_local = round(ratio * b)
         out = []
-        for g in range(len(km.cluster_centers_)):
+        for g in range(len(centres)):
             rows = np.flatnonzero(labels == g)
             if not len(rows):
                 continue
-            order = np.argsort(((Ftr - km.cluster_centers_[g]) ** 2).sum(axis=1), kind="stable")
+            order = np.argsort(((Ftr - centres[g]) ** 2).sum(axis=1), kind="stable")
             pool = order[: min(n, max(n_local, pool_factor * n_local))]
             subsets = []
             for s in np.random.SeedSequence([int(seed), g]).spawn(n_estimators):
@@ -522,6 +529,94 @@ def local_mix_routing(X_train, y_train, X_test, budget, n_estimators, seed, task
                 subsets.append(idx)
             out.append((rows, subsets))
     return out
+
+
+def _rbf_bandwidth(F, seed, n_rows=1000) -> float:
+    """Median pairwise distance of a seeded sample of rows (the median heuristic)."""
+    rows = np.random.default_rng([int(seed), 606]).choice(len(F), min(len(F), n_rows), replace=False)
+    Z = F[rows]
+    d = np.sqrt(np.clip((Z**2).sum(1)[:, None] + (Z**2).sum(1)[None, :] - 2 * Z @ Z.T, 0, None))
+    d = d[np.triu_indices(len(Z), 1)]
+    d = d[d > 0]
+    return float(np.median(d)) if len(d) else 1.0
+
+
+def kernel_mean(F_cand, F_target, gamma, chunk=256) -> np.ndarray:
+    """mu(x) = mean over target rows q of exp(-gamma |x - q|^2), for every candidate row x."""
+    a2 = (F_cand**2).sum(axis=1)
+    mu = np.zeros(len(F_cand))
+    for i in range(0, len(F_target), chunk):
+        Q = F_target[i : i + chunk]
+        D = np.clip(a2[:, None] + (Q**2).sum(axis=1)[None, :] - 2 * F_cand @ Q.T, 0, None)
+        mu += np.exp(-gamma * D).sum(axis=1)
+    return mu / len(F_target)
+
+
+def kernel_herding(F_cand, mu, k, gamma) -> np.ndarray:
+    """Greedy MMD minimisation: repeatedly add the candidate maximising mu(x) - mean over picked s of k(x, s), which
+    is the exact greedy step for an RBF kernel (k(x, x) = 1). Deterministic. Indices into F_cand, in picking order."""
+    n = len(F_cand)
+    a2 = (F_cand**2).sum(axis=1)
+    acc = np.zeros(n)
+    picked = np.zeros(n, dtype=bool)
+    out = []
+    for t in range(min(int(k), n)):
+        score = mu - acc / (t + 1)
+        score[picked] = -np.inf
+        j = int(np.argmax(score))
+        out.append(j)
+        picked[j] = True
+        acc += np.exp(-gamma * np.maximum(a2 + a2[j] - 2.0 * (F_cand @ F_cand[j]), 0.0))
+    return np.asarray(out, dtype=np.int64)
+
+
+def crumb_routing(X_train, y_train, X_test, budget, n_estimators, seed, task="classification", n_groups=8, per_estimator=False, keep_frac=0.7):
+    """CRUMB (Heredge et al., arXiv 2606.11473): k-means the test rows (features only), then per group choose the
+    training rows whose distribution matches the group by kernel herding (RBF, median-heuristic bandwidth on the
+    train-fitted feature space). `per_estimator=False`: one herded context shared by all estimators, as in the paper.
+    `per_estimator=True`: estimator e herds from its own random `keep_frac` of the training rows. Kernel, bandwidth
+    and class coverage are this harness's choices. Returns [(test_row_indices, [subset per estimator])]; transductive.
+    """
+    _check_budget(budget)
+    n = len(X_train)
+    with threadpool_limits(limits=1):
+        Ftr, Fte, labels, centres = _test_groups(X_train, X_test, seed, n_groups)
+        gamma = 1.0 / (2.0 * _rbf_bandwidth(Ftr, seed) ** 2)
+        b = min(int(budget), n)
+        out = []
+        for g in range(len(centres)):
+            rows = np.flatnonzero(labels == g)
+            if not len(rows):
+                continue
+            ss = np.random.SeedSequence([int(seed), g, 606]).spawn(n_estimators)
+            if b >= n:
+                out.append((rows, [np.random.default_rng(s).permutation(n) for s in ss]))
+                continue
+            mu = kernel_mean(Ftr, Fte[rows], gamma)
+
+            def herd(cand, rng):
+                idx = cand[kernel_herding(Ftr[cand], mu[cand], b, gamma)]
+                if task == "classification":  # swap the last-herded rows first
+                    idx = _ensure_class_coverage(idx[::-1], y_train, rng)[::-1].copy()
+                return idx
+
+            if per_estimator:
+                keep = max(b, round(keep_frac * n))
+                subsets = []
+                for s in ss:
+                    rng = np.random.default_rng(s)
+                    subsets.append(herd(np.sort(rng.choice(n, keep, replace=False)), rng))
+            else:
+                idx = herd(np.arange(n), np.random.default_rng(ss[0]))
+                subsets = [idx.copy() for _ in range(n_estimators)]
+            out.append((rows, subsets))
+    return out
+
+
+ROUTED_METHODS = {
+    "crumb": partial(crumb_routing, per_estimator=False),
+    "crumb_perest": partial(crumb_routing, per_estimator=True),
+}
 
 
 def per_estimator_subsets(method, X, y, budget, n_estimators, seed, task="classification", **kw) -> list[np.ndarray]:

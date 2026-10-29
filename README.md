@@ -89,6 +89,10 @@ python -m tabpfn_lab.cli analyze --csv results/tables/perest_dev.csv   # dev tab
 - Local: `local_mix_r<R>` for each R in `local_ratios`. The test rows are grouped by their features (never their
   labels), and each group gets contexts with a share R of rows near it. These rows are flagged `transductive`.
 - Experts: `cluster_experts`, plus `cluster_experts+gate` with per-test-row estimator weights.
+- CRUMB (`configs/perest_crumb.yaml`, a separate run): `crumb` groups the test features with k-means, then picks one
+  1024-row context per group by kernel herding (greedy MMD matching to the group; RBF kernel, median-heuristic
+  bandwidth), shared by all 8 estimators. `crumb_perest` herds once per estimator from a random 70% of the training
+  rows. Both are flagged `transductive`; herding time shows up in `selection_seconds`.
 - Coreset runs also write `<name>.timing.csv` (fit, predict and selection seconds, number of fits per cell), and
   `analyze` adds the mean cost to the dev table.
 
