@@ -451,18 +451,125 @@ def sub_cluster_experts(X, y, budget, n_estimators, seed, task):
     return out
 
 
-def cluster_gate(X_train, X_test, n_estimators, seed) -> np.ndarray:
-    """(E, n_test) weights for `cluster_experts`: softmax over estimators of -d(x, centre_e)^2 / tau, with tau the
-    median squared distance of training rows to their own centre. Uses test features only."""
+def gate_weights(d, tau, bias=None) -> np.ndarray:
+    """(E, n) estimator weights per row: softmax over estimators of -d / tau (+ a per-estimator bias)."""
+    z = -(d - d.min(axis=0, keepdims=True)) / tau
+    if bias is not None:
+        z = z + np.asarray(bias, np.float64)[:, None]
+    z = z - z.max(axis=0, keepdims=True)
+    w = np.exp(z)
+    return w / w.sum(axis=0, keepdims=True)
+
+
+def cluster_gate_distances(X_train, X_evals, n_estimators, seed) -> tuple[list[np.ndarray], float]:
+    """Squared distances (E, n) of each evaluation set's rows to the `cluster_experts` centres of X_train, and the
+    heuristic gate temperature: the median squared distance of training rows to their own centre."""
     with threadpool_limits(limits=1):
         T, km, labels, F = _expert_clusters(X_train, n_estimators, seed)
         C = km.cluster_centers_
         tau = float(np.median(((F - C[labels]) ** 2).sum(axis=1))) or 1.0
-        d = ((T(X_test)[None, :, :] - C[:, None, :]) ** 2).sum(axis=2)  # (K, n_test)
-        d = d[np.arange(n_estimators) % len(C)]
-        z = -(d - d.min(axis=0, keepdims=True)) / tau
-        w = np.exp(z)
-    return w / w.sum(axis=0, keepdims=True)
+        order = np.arange(n_estimators) % len(C)
+        ds = [((T(Xe)[None, :, :] - C[:, None, :]) ** 2).sum(axis=2)[order] for Xe in X_evals]
+    return ds, tau
+
+
+def cluster_gate(X_train, X_test, n_estimators, seed) -> np.ndarray:
+    """(E, n_test) weights for `cluster_experts`: softmax over estimators of -d(x, centre_e)^2 / tau, with tau the
+    median squared distance of training rows to their own centre. Uses test features only."""
+    (d,), tau = cluster_gate_distances(X_train, [X_test], n_estimators, seed)
+    return gate_weights(d, tau)
+
+
+GATE_TAU_GRID = np.logspace(-2, 2, 41)  # multipliers of the heuristic temperature tried by `fit_gate`
+
+
+def _gate_objective(w, score, y=None):
+    """(loss, d loss / d w) of gate weights w (E, n) on held-out rows. With y None, `score` is each estimator's
+    log-likelihood of the true label and the loss is the mean negative log-likelihood of the mixture; otherwise
+    `score` is each estimator's predicted mean and the loss is the squared error of the mixture mean over var(y)."""
+    n = w.shape[1]
+    if y is None:
+        shift = score.max(axis=0)
+        p = np.exp(score - shift)
+        mix = (w * p).sum(axis=0)
+        return float(-np.mean(np.log(mix) + shift)), -p / mix / n
+    scale = float(np.var(y)) or 1.0
+    r = (w * score).sum(axis=0) - y
+    return float(np.mean(r**2) / scale), 2 * r * score / (n * scale)
+
+
+def gate_loss(d, score, tau, bias=None, y=None) -> float:
+    return _gate_objective(gate_weights(d, tau, bias), score, y)[0]
+
+
+def fit_gate(d, score, tau0, y=None, bias=False, ridge=1e-3) -> dict:
+    """Fit the gate on held-out *training* rows. `d` (E, n): squared distances to the expert centres. `score` (E, n):
+    each expert's log-likelihood of the row's training label (classification), or with `y` its predicted mean, the
+    gate then minimising the squared error of the mixture mean (regression); see `_gate_objective`.
+
+    The temperature is a grid search over `GATE_TAU_GRID * tau0` (ties go to the multiplier nearest 1). With `bias`,
+    a per-expert offset is then fitted jointly with the temperature (L-BFGS, ridge penalty on the offsets), starting
+    from the grid solution. Returns {"tau", "bias", "loss", "loss_heuristic", "nearest_is_best"}.
+    """
+    d = np.asarray(d, np.float64)
+    score = np.asarray(score, np.float64)
+    if y is None:
+        score = np.maximum(score, -50.0)
+        best_expert = score.argmax(axis=0)
+    else:
+        y = np.asarray(y, np.float64)
+        best_expert = np.abs(score - y).argmin(axis=0)
+    E = d.shape[0]
+    losses = np.array([gate_loss(d, score, m * tau0, y=y) for m in GATE_TAU_GRID])
+    best = np.flatnonzero(losses <= losses.min() + 1e-12)
+    k = best[np.argmin(np.abs(np.log(GATE_TAU_GRID[best])))]
+    res = {
+        "tau": float(GATE_TAU_GRID[k] * tau0),
+        "bias": None,
+        "loss": float(losses[k]),
+        "loss_heuristic": gate_loss(d, score, tau0, y=y),
+        "nearest_is_best": float(np.mean(d.argmin(axis=0) == best_expert)),
+    }
+    if not bias:
+        return res
+    from scipy.optimize import minimize
+
+    dd = d - d.min(axis=0, keepdims=True)
+
+    def objective(theta):
+        s, b = theta[0], theta[1:]
+        w = gate_weights(d, float(np.exp(s)), b)
+        loss, gw = _gate_objective(w, score, y)
+        g = w * (gw - (w * gw).sum(axis=0, keepdims=True))  # d loss / d z, with w = softmax(z), z = -dd / tau + b
+        grad = np.concatenate([[(g * dd).sum() * np.exp(-s)], g.sum(axis=1) + 2 * ridge * b])
+        return loss + ridge * float(b @ b), grad
+
+    lo, hi = np.log(GATE_TAU_GRID[0] * tau0), np.log(GATE_TAU_GRID[-1] * tau0)
+    opt = minimize(objective, np.concatenate([[np.log(res["tau"])], np.zeros(E)]), jac=True, method="L-BFGS-B", bounds=[(lo, hi)] + [(-10, 10)] * E)
+    tau, b = float(np.exp(opt.x[0])), opt.x[1:]
+    loss = gate_loss(d, score, tau, b, y=y)
+    if loss < res["loss"]:
+        res.update(tau=tau, bias=b, loss=loss)
+    else:  # never worse than the temperature-only gate on the rows it was fitted on
+        res["bias"] = np.zeros(E)
+    return res
+
+
+def gate_holdout(y, seed, task, val_fraction=0.2, val_max=2000) -> tuple[np.ndarray, np.ndarray]:
+    """(context_pool_idx, val_idx): a seeded random slice of the training rows kept out of every expert's context so
+    the gate can be fitted on it. Every class keeps at least one row in the context pool."""
+    n = len(y)
+    rng = np.random.default_rng([int(seed), 606])
+    n_val = int(min(val_max, round(val_fraction * n)))
+    val = np.zeros(n, bool)
+    val[rng.permutation(n)[:n_val]] = True
+    if task == "classification":
+        y = np.asarray(y)
+        for c in np.unique(y):
+            rows = np.flatnonzero(y == c)
+            if val[rows].all():
+                val[rows[0]] = False
+    return np.flatnonzero(~val), np.flatnonzero(val)
 
 
 PER_ESTIMATOR_METHODS = {

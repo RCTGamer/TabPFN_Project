@@ -89,6 +89,13 @@ python -m tabpfn_lab.cli analyze --csv results/tables/perest_dev.csv   # dev tab
 - Local: `local_mix_r<R>` for each R in `local_ratios`. The test rows are grouped by their features (never their
   labels), and each group gets contexts with a share R of rows near it. These rows are flagged `transductive`.
 - Experts: `cluster_experts`, plus `cluster_experts+gate` with per-test-row estimator weights.
+- Fitted gate (`configs/perest_gate.yaml`, a separate run): `cluster_experts_tuned` keeps a slice of the training rows
+  (`val_fraction`, at most `val_max`) out of every expert's context, predicts it with every expert and fits the gate
+  on it: the temperature by grid search, and for the `+bias` row a per-expert offset too. Classification minimises the
+  log loss of the gated mixture, regression the squared error of its mean. `+heuristic` is the same experts with the
+  untuned gate. Only training labels are used and a row's weights depend on that row alone, so the rows are not
+  `transductive`. Each cell logs a `gate fit` line with the fitted temperature (as a multiple of the heuristic one),
+  the held-out losses, and `nearest_is_best`, the share of held-out rows whose nearest expert is also the best one.
 - CRUMB (`configs/perest_crumb.yaml`, a separate run): `crumb` groups the test features with k-means, then picks one
   1024-row context per group by kernel herding (greedy MMD matching to the group; RBF kernel, median-heuristic
   bandwidth), shared by all 8 estimators. `crumb_perest` herds once per estimator from a random 70% of the training
