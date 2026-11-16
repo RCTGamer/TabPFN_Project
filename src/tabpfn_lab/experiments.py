@@ -364,6 +364,14 @@ def _score(split: Split, pred, levels) -> dict:
 # --------------------------------------------------------------------------- generic runner
 
 
+def _gpu_peak(backend) -> float:
+    return gpu_peak_mb() if backend.uses_gpu else float("nan")
+
+
+def _device_name(backend) -> str:
+    return (gpu_name() if backend.uses_gpu else "") or "cpu"
+
+
 def _append(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
@@ -416,7 +424,7 @@ def _run_cells(cfg, ctx: Context, cells: list[Cell], run_cell, shard, meta: dict
             log.error("cell %d/%d FAILED %s: %s: %s\n%s", k + 1, len(cells), cell.id, type(e).__name__, e, traceback.format_exc(limit=3))
             continue
         _append(csv, rows)
-        log.info("cell %d/%d %s rows=%d wall=%.2fs peak_gpu_mb=%.0f", k + 1, len(cells), cell.id, len(rows), time.time() - t0, gpu_peak_mb())
+        log.info("cell %d/%d %s rows=%d wall=%.2fs peak_gpu_mb=%.0f", k + 1, len(cells), cell.id, len(rows), time.time() - t0, _gpu_peak(ctx.backend))
     meta["backend_meta"] = ctx.backend_meta
     meta["split_hashes"] = ctx.split_hashes
     _write_meta(csv, meta)
@@ -781,7 +789,7 @@ def _coreset_cell(cfg, ctx: Context, cell: Cell) -> list[dict]:
             "split_seed": int(cell.split_seed), "seed": int(cell.seed), "budget": int(cell.budget), "budget_key": cell.budget_key,
             "n_train": int(split.n_train), "n_test": int(split.n_test), "n_features": int(split.X_train.shape[1]), "n_estimators": int(E),
             "fit_seconds": c["fit_seconds"], "predict_seconds": c["predict_seconds"], "total_seconds": total,
-            "peak_gpu_mb": gpu_peak_mb(), "device_name": gpu_name() or "cpu", "hostname": socket.gethostname(),
+            "peak_gpu_mb": _gpu_peak(ctx.backend), "device_name": _device_name(ctx.backend), "hostname": socket.gethostname(),
             "method": cell.method, "n_fits": c["n_fits"], "selection_seconds": max(0.0, total - c["fit_seconds"] - c["predict_seconds"]),
         }
         ctx.timing_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -920,8 +928,8 @@ def _scaling_cell(cfg, ctx: Context, cell: Cell, timing_csv: Path) -> list[dict]
         "fit_seconds": t.get("fit_seconds", float("nan")),
         "predict_seconds": t.get("predict_seconds", float("nan")),
         "total_seconds": total,
-        "peak_gpu_mb": gpu_peak_mb(),
-        "device_name": out.meta.get("device_name", "") or gpu_name() or "cpu",
+        "peak_gpu_mb": _gpu_peak(ctx.backend),
+        "device_name": out.meta.get("device_name", "") or _device_name(ctx.backend),
         "hostname": socket.gethostname(),
     }
     # written before the results rows: a crash in between leaves a timing row whose cell reruns (read_timing keeps the last)
