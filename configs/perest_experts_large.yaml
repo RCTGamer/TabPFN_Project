@@ -1,0 +1,46 @@
+# Local experts on the six larger dev datasets: cluster count scaled to the data, supervised feature weighting and
+# overlapping contexts, each with the gate fitted on held-out training rows. Compared with random per-estimator
+# contexts and the 8-cluster cluster_experts_tuned of perest_gate_large.yaml (same datasets, budget and split seeds).
+#   python -m tabpfn_lab.cli coreset --config configs/perest_experts_large.yaml
+#   python -m tabpfn_lab.cli analyze --csv results/tables/perest_experts_large.csv
+#   grep "expert fit" results/logs/perest_experts_large.log
+#
+#   experts_scaled    about n_train / 1024 clusters (30 on electricity, 66 on higgs) instead of 8
+#   experts_weighted  the same, clustered in a feature space scaled by supervised importance (training labels)
+#   experts_overlap   twice as many clusters, so each 1024-row context reaches into its neighbours
+#   experts_full      weighting and overlap together
+# Every row is still predicted by 8 experts, the ones nearest its own nearest centre. Each variant also writes
+# `+heuristic` (untuned gate) and `+hard` (nearest expert only). Not transductive.
+# Cost: one model fit per centre with rows routed to it, so 30 to 128 fits per cell instead of 1. Lower
+# max_clusters to shorten the run. More seeds can be added later; finished cells are kept.
+name: perest_experts_large
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}      # n_train ~32k, 8 features
+    - {name: jungle_chess, source: openml, data_id: 41027, task: classification}   # n_train ~31k, 6 features
+    - {name: jannis, source: openml, data_id: 41168, task: classification}         # n_train ~59k, 54 features
+    - {name: higgs, source: openml, data_id: 23512, task: classification}          # n_train ~69k, 28 features
+    - {name: house_16H, source: openml, data_id: 574, task: regression}            # n_train ~16k, 16 features
+    - {name: fried, source: openml, data_id: 564, task: regression}                # n_train ~29k, 10 features
+  confirm: []
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: []
+budget_absolute: [1024]          # rows per expert
+coreset_methods: [perest_random, cluster_experts_tuned, experts_scaled, experts_weighted, experts_overlap, experts_full]
+coreset_kwargs:
+  cluster_experts_tuned: {val_fraction: 0.2, val_max: 2000}
+  experts_scaled: {val_fraction: 0.2, val_max: 2000, max_clusters: 128}
+  experts_weighted: {val_fraction: 0.2, val_max: 2000, max_clusters: 128}
+  experts_overlap: {val_fraction: 0.2, val_max: 2000, max_clusters: 128}
+  experts_full: {val_fraction: 0.2, val_max: 2000, max_clusters: 128}
+perest_mode: single_fit
+baseline: perest_random
+combined_aggregators: []
+split_seeds: 3
+selection_seeds: 1
+cache_dir: null
+log_dir: results/logs
+out_csv: results/tables/perest_experts_large.csv
