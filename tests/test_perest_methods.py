@@ -224,3 +224,313 @@ def test_crumb_never_sees_test_labels(tmp_path, monkeypatch):
     run_coreset(cfg)
     split = experiments.Context(experiments.normalize_config(cfg, "coreset"), None).split("clf", 0)
     assert seen and all(s == (split.n_train, split.n_train, split.n_test) for s in seen)
+
+
+# --------------------------------------------------------------------------- gate fitted on held-out training rows
+
+
+def _gate_toy(rng, n=600, E=4, good=2.0):
+    """Row i belongs to expert home[i]; `d` is small to the home centre; `good` is the home expert's log-lik edge."""
+    home = rng.integers(0, E, n)
+    d = rng.uniform(4, 9, (E, n))
+    d[home, np.arange(n)] = rng.uniform(0, 1, n)
+    L = rng.normal(-2.0, 0.3, (E, n))
+    L[home, np.arange(n)] += good
+    return d, L, home
+
+
+def test_fit_gate_follows_expert_competence():
+    rng = np.random.default_rng(0)
+    d, L, _ = _gate_toy(rng)
+    sharp = cs.fit_gate(d, L, tau0=5.0)
+    assert sharp["tau"] < 5.0 and sharp["loss"] < sharp["loss_heuristic"] and sharp["nearest_is_best"] > 0.95
+    # the nearest expert is no better than the others: the fitted gate flattens towards the plain mean
+    flat = cs.fit_gate(d, rng.normal(-2.0, 0.3, d.shape), tau0=0.5)
+    assert flat["tau"] > 0.5 and flat["loss"] <= flat["loss_heuristic"]
+    assert sharp["bias"] is None and sharp["loss"] == pytest.approx(cs.gate_loss(d, L, sharp["tau"]))
+
+
+def test_fit_gate_bias_downweights_a_bad_expert():
+    rng = np.random.default_rng(1)
+    d, L, home = _gate_toy(rng, good=0.5)
+    L[0] -= 3.0  # expert 0 is poor everywhere, on its own cluster too
+    plain = cs.fit_gate(d, L, tau0=1.0)
+    fit = cs.fit_gate(d, L, tau0=1.0, bias=True)
+    assert fit["loss"] < plain["loss"]
+    assert fit["bias"][0] == fit["bias"].min() and fit["bias"][0] < fit["bias"][1:].mean() - 1.0
+    w = cs.gate_weights(d, fit["tau"], fit["bias"])
+    np.testing.assert_allclose(w.sum(axis=0), 1.0)
+    assert w[0, home == 0].mean() < cs.gate_weights(d, plain["tau"])[0, home == 0].mean()
+    again = cs.fit_gate(d, L, tau0=1.0, bias=True)
+    assert again["tau"] == fit["tau"] and np.array_equal(again["bias"], fit["bias"])
+
+
+def test_gate_weights_without_bias_is_the_heuristic_gate(data):
+    X, _ = data
+    (d,), tau = cs.cluster_gate_distances(X[:500], [X[500:]], 4, 0)
+    assert np.array_equal(cs.gate_weights(d, tau), cs.cluster_gate(X[:500], X[500:], 4, 0))
+
+
+@pytest.mark.parametrize("task", ["classification", "regression"])
+def test_gate_holdout(task):
+    y = np.r_[np.zeros(197, int), np.ones(3, int)] if task == "classification" else np.arange(200.0)
+    for seed in range(20):
+        pool, val = cs.gate_holdout(y, seed, task, val_fraction=0.5)
+        assert sorted(np.r_[pool, val].tolist()) == list(range(200)) and 97 <= len(val) <= 100
+        if task == "classification":
+            assert set(y[pool]) == {0, 1}
+    assert np.array_equal(cs.gate_holdout(y, 3, task)[1], cs.gate_holdout(y, 3, task)[1])
+    assert len(cs.gate_holdout(y, 3, task, val_max=10)[1]) == 10
+
+
+def test_fit_gate_regression_minimises_error_of_the_mixture_mean():
+    rng = np.random.default_rng(2)
+    d, _, home = _gate_toy(rng)
+    y = rng.normal(0, 1, d.shape[1])
+    mu = y + rng.normal(0, 1.0, d.shape)  # every expert is noisy ...
+    mu[home, np.arange(d.shape[1])] = y + rng.normal(0, 0.1, d.shape[1])  # ... except on its own rows
+    plain = cs.fit_gate(d, mu, tau0=5.0, y=y)
+    assert plain["tau"] < 5.0 and plain["loss"] < plain["loss_heuristic"] and plain["nearest_is_best"] > 0.8
+    m = (cs.gate_weights(d, plain["tau"]) * mu).sum(axis=0)
+    assert plain["loss"] == pytest.approx(np.mean((m - y) ** 2) / np.var(y))
+    mu[0] += 2.0  # expert 0 is biased everywhere, on its own rows too
+    fit = cs.fit_gate(d, mu, tau0=5.0, y=y, bias=True)
+    assert fit["loss"] < cs.fit_gate(d, mu, tau0=5.0, y=y)["loss"] and fit["bias"][0] == fit["bias"].min()
+
+
+@pytest.mark.parametrize("regression", [False, True])
+def test_fit_gate_gradient(regression, monkeypatch):
+    from scipy.optimize import check_grad, minimize
+
+    rng = np.random.default_rng(3)
+    d, score = rng.uniform(0, 9, (5, 200)), rng.normal(-2, 1, (5, 200))
+    y = rng.normal(0, 1, 200) if regression else None
+    errs = []
+
+    def checking(fun, x0, jac=None, **kw):
+        for x in (x0, x0 + rng.normal(0, 0.3, len(x0))):
+            errs.append(check_grad(lambda t: fun(t)[0], lambda t: fun(t)[1], x))
+        return minimize(fun, x0, jac=jac, **kw)
+
+    monkeypatch.setattr("scipy.optimize.minimize", checking)
+    cs.fit_gate(d, score, tau0=1.0, y=y, bias=True)
+    assert len(errs) == 2 and max(errs) < 1e-5
+
+
+TUNED = ["cluster_experts_tuned", "cluster_experts_tuned+bias", "cluster_experts_tuned+heuristic"]
+
+
+@pytest.mark.parametrize("mode", ["single_fit", "separate_fits"])
+def test_tuned_gate_run(tmp_path, mode):
+    methods = ["perest_random", "cluster_experts", "cluster_experts_tuned"]
+    csv = run_coreset(_cfg(tmp_path / "a", methods, perest_mode=mode))
+    assert cli.validate_csv(csv) == []
+    df = read_results(csv)
+    assert set(TUNED) <= set(df["method"])
+    assert (df.loc[df["method"].isin(TUNED), "flags"] == "").all()  # a row's weights depend on that row only
+    assert df.groupby("method")["cell"].nunique()[TUNED].nunique() == 1
+    t = read_timing(timing_path(csv))
+    fits = 2 if mode == "single_fit" else 8  # the experts are fitted again to predict the held-out training rows
+    assert (t.loc[t["method"] == "cluster_experts_tuned", "n_fits"] == fits).all()
+    dev = cli.analyze(csv)["dev"]
+    assert dev.loc[dev["method"].isin(TUNED), "improvement"].notna().all()
+    again = run_coreset(_cfg(tmp_path / "b", methods, perest_mode=mode))
+    assert csv.read_bytes() == again.read_bytes()
+
+
+@pytest.mark.parametrize("ds", [0, 1])
+def test_tuned_gate_never_uses_test_labels(tmp_path, monkeypatch, ds):
+    """Scrambling the test labels changes neither the held-out slice, the labels the gate is fitted on, nor the fit."""
+    import dataclasses
+
+    spec = _cfg(tmp_path, [])["datasets"]["dev"][ds]
+    cfg = experiments.normalize_config(_cfg(tmp_path, ["cluster_experts_tuned"], datasets={"dev": [spec], "confirm": []}), "coreset")
+    ctx = experiments.Context(cfg, None)
+    split = ctx.split(spec["name"], 0)
+    calls = []
+    real = cs.fit_gate
+
+    def spy(d, score, tau0, y=None, **kw):
+        res = real(d, score, tau0, y=y, **kw)
+        assert (y is None) == (split.task == "classification")
+        assert y is None or np.array_equal(y, split.y_train[cs.gate_holdout(split.y_train, 0, split.task)[1]])
+        calls.append((np.array(d), np.array(score), res["tau"], res["bias"]))
+        return res
+
+    monkeypatch.setattr(experiments.cs, "fit_gate", spy)
+    experiments.evaluate_coreset(cfg, ctx, split, "cluster_experts_tuned", 60, 0)
+    y_bad = np.random.default_rng(0).permutation(split.y_test)
+    assert not np.array_equal(y_bad, split.y_test)
+    experiments.evaluate_coreset(cfg, ctx, dataclasses.replace(split, y_test=y_bad), "cluster_experts_tuned", 60, 0)
+    assert len(calls) == 4
+    n_val = len(cs.gate_holdout(split.y_train, 0, split.task)[1])
+    for a, b in zip(calls[:2], calls[2:]):
+        assert a[0].shape == a[1].shape == (4, n_val)  # fitted on the held-out training slice
+        assert np.array_equal(a[0], b[0]) and np.array_equal(a[1], b[1]) and a[2] == b[2]
+        assert (a[3] is None and b[3] is None) or np.array_equal(a[3], b[3])
+
+
+def test_tuned_gate_holdout_rows_are_in_no_context(tmp_path, monkeypatch):
+    spec = _cfg(tmp_path, [])["datasets"]["dev"][0]
+    cfg = experiments.normalize_config(_cfg(tmp_path, ["cluster_experts_tuned"], datasets={"dev": [spec], "confirm": []}), "coreset")
+    ctx = experiments.Context(cfg, None)
+    split = ctx.split("clf", 0)
+    seen = []
+    real = ctx.outputs
+
+    def spy(split_, X, y, E, seed, tag, overrides=None, X_eval=None):
+        seen.append((X, X_eval, overrides["SUBSAMPLE_SAMPLES"]))
+        return real(split_, X, y, E, seed, tag, overrides=overrides, X_eval=X_eval)
+
+    monkeypatch.setattr(ctx, "outputs", spy)
+    experiments.evaluate_coreset(cfg, ctx, split, "cluster_experts_tuned", 60, 0)
+    pool, val = cs.gate_holdout(split.y_train, 0, split.task)
+    (X_fit, ev_test, subs), (X_fit2, ev_val, subs2) = seen
+    assert np.array_equal(X_fit, split.X_train[pool]) and np.array_equal(X_fit2, X_fit) and ev_test is None
+    assert np.array_equal(ev_val, split.X_train[val])
+    assert all(np.array_equal(a, b) and len(a) == 60 and a.max() < len(pool) for a, b in zip(subs, subs2))
+
+
+# --------------------------------------------------------------------------- local experts: scaled count, weighting, overlap
+
+
+@pytest.mark.parametrize("task", ["classification", "regression"])
+@pytest.mark.parametrize("weighted", [False, True])
+@pytest.mark.parametrize("coverage", [1.0, 2.0])
+def test_expert_plan_contract(task, weighted, coverage):
+    X, y = make_synthetic(1500, 5, n_classes=3, imbalance=[0.7, 0.2, 0.1], task=task, seed=1)
+    Xtr, ytr, Xte = X[:1200], y[:1200], X[1200:]
+    plan = cs.expert_plan(Xtr, ytr, 100, 4, 3, task, weighted=weighted, coverage=coverage)
+    K = len(plan.centres)
+    assert K == int(coverage * 12) and len(plan.contexts) == K and plan.neighbours.shape == (K, 4)
+    assert np.array_equal(plan.neighbours[:, 0], np.arange(K))  # a centre is its own first expert
+    assert all(len(set(row)) == 4 for row in plan.neighbours.tolist())
+    for c in plan.contexts:
+        assert len(c) == 100 and len(np.unique(c)) == 100 and c.min() >= 0 and c.max() < len(Xtr)
+        if task == "classification":
+            assert set(np.unique(ytr[c])) == {0, 1, 2}
+    assert (plan.scale is None) == (not weighted) and plan.tau0 > 0
+    again = cs.expert_plan(Xtr, ytr, 100, 4, 3, task, weighted=weighted, coverage=coverage)
+    assert all(np.array_equal(a, b) for a, b in zip(plan.contexts, again.contexts)) and np.array_equal(plan.centres, again.centres)
+    home, d = cs.expert_route(plan, Xte)
+    assert d.shape == (4, len(Xte)) and (d[0] <= d + 1e-12).all()  # the home centre is the nearest one
+    full = cs._sq_dists(plan.space(Xte), plan.centres)
+    assert np.array_equal(home, full.argmin(axis=0))
+    np.testing.assert_allclose(d, full[plan.neighbours[home].T, np.arange(len(Xte))])
+    # a row is routed by its own features: routing it alone or in another order gives the same answer
+    perm = np.random.default_rng(0).permutation(len(Xte))
+    home_p, d_p = cs.expert_route(plan, Xte[perm])
+    assert np.array_equal(home_p, home[perm])
+    np.testing.assert_allclose(d_p, d[:, perm], atol=1e-9)
+    home_1, d_1 = cs.expert_route(plan, Xte[:1])
+    assert home_1[0] == home[0]
+    np.testing.assert_allclose(d_1[:, 0], d[:, 0], atol=1e-9)
+
+
+def test_expert_plan_cluster_count_scales_and_is_capped():
+    X, y = make_synthetic(3000, 4, n_classes=2, seed=2)
+    count = lambda **kw: len(cs.expert_plan(X, y, **{"budget": 100, "n_estimators": 4, "seed": 0, "task": "classification", **kw}).centres)  # noqa: E731
+    assert count() == 30 and count(coverage=2.0) == 60
+    assert count(max_clusters=16) == 16 and count(budget=1000) == 4  # never fewer clusters than estimators
+    with pytest.raises(ValueError):
+        cs.expert_plan(X[:3], y[:3], 2, 4, 0, "classification")
+
+
+def test_expert_contexts_overlap_with_higher_coverage():
+    X, y = make_synthetic(2400, 4, task="regression", seed=4)
+    share = {}
+    for coverage in (1.0, 2.0):
+        plan = cs.expert_plan(X, y, 200, 4, 0, "regression", coverage=coverage)
+        used = np.bincount(np.concatenate(plan.contexts), minlength=len(X))
+        share[coverage] = (used > 1).mean()
+        assert (used > 0).mean() > 0.6
+    assert share[2.0] > share[1.0] + 0.2  # with twice the centres most rows sit in more than one context
+
+
+@pytest.mark.parametrize("task", ["classification", "regression"])
+def test_supervised_feature_scale_downweights_noise_features(task):
+    rng = np.random.default_rng(0)
+    F = rng.normal(size=(2000, 6))
+    signal = F[:, 0] + 0.5 * F[:, 1]
+    y = (signal > 0).astype(int) if task == "classification" else signal + 0.1 * rng.normal(size=2000)
+    scale = cs.supervised_feature_scale(F, y, task, seed=0)
+    assert scale.shape == (6,) and (scale > 0).all()
+    np.testing.assert_allclose(np.mean(scale**2), 1.0)
+    assert scale[0] > scale[1] > scale[2:].max() and scale[2:].max() < 0.6
+    assert np.array_equal(scale, cs.supervised_feature_scale(F, y, task, seed=0))
+    # weighted clusters follow the features that matter: the target varies less inside them
+    X = np.c_[F[:, :2], 3 * F[:, 2:]]  # the noise features dominate plain distance
+    spread = {}
+    for weighted in (False, True):
+        plan = cs.expert_plan(X, y, 250, 4, 0, task, weighted=weighted)
+        labels = cs._sq_dists(plan.space(X), plan.centres).argmin(axis=0)
+        spread[weighted] = np.mean([np.var(signal[labels == c]) for c in np.unique(labels)])
+    assert spread[True] < 0.8 * spread[False]
+
+
+EXPERTS = list(experiments.EXPERT_VARIANTS)
+
+
+def test_expert_variants_run(tmp_path):
+    methods = ["perest_random", *EXPERTS]
+    csv = run_coreset(_cfg(tmp_path / "a", methods))
+    assert cli.validate_csv(csv) == []
+    df = read_results(csv)
+    rows = [f"{m}{x}" for m in EXPERTS for x in ("", "+heuristic", "+hard")]
+    assert set(rows) <= set(df["method"])
+    assert (df.loc[df["method"].isin(rows), "flags"] == "").all()  # a row is routed by its own features only
+    assert not df["value"].isna().any()
+    t = read_timing(timing_path(csv))
+    for m in EXPERTS:  # one fit per centre with rows routed to it: clf pool 336 rows / 60 -> 6 centres (12 with overlap)
+        fits = t.loc[(t["method"] == m) & (t["dataset"] == "clf"), "n_fits"]
+        top = 6 * int(experiments.EXPERT_VARIANTS[m]["coverage"])
+        assert ((fits > 1) & (fits <= top)).all()
+    dev = cli.analyze(csv)["dev"]
+    assert dev.loc[dev["method"].isin(rows), "improvement"].notna().all()
+    again = run_coreset(_cfg(tmp_path / "b", methods))
+    assert csv.read_bytes() == again.read_bytes()
+
+
+@pytest.mark.parametrize("ds", [0, 1])
+def test_expert_variants_never_use_test_labels(tmp_path, monkeypatch, ds):
+    import dataclasses
+
+    spec = _cfg(tmp_path, [])["datasets"]["dev"][ds]
+    cfg = experiments.normalize_config(_cfg(tmp_path, ["experts_full"], datasets={"dev": [spec], "confirm": []}), "coreset")
+    ctx = experiments.Context(cfg, None)
+    split = ctx.split(spec["name"], 0)
+    pool, val = cs.gate_holdout(split.y_train, 0, split.task)
+    fits, plans = [], []
+    real_fit, real_plan = cs.fit_gate, cs.expert_plan
+
+    def spy_fit(d, score, tau0, y=None, **kw):
+        res = real_fit(d, score, tau0, y=y, **kw)
+        assert d.shape == score.shape == (4, len(val))  # fitted on the held-out training slice only
+        assert y is None or np.array_equal(y, split.y_train[val])
+        fits.append((np.array(d), np.array(score), res["tau"]))
+        return res
+
+    def spy_plan(X, y, *a, **kw):
+        assert np.array_equal(X, split.X_train[pool]) and np.array_equal(y, split.y_train[pool])  # no held-out, no test rows
+        plans.append(real_plan(X, y, *a, **kw))
+        return plans[-1]
+
+    monkeypatch.setattr(experiments.cs, "fit_gate", spy_fit)
+    monkeypatch.setattr(experiments.cs, "expert_plan", spy_plan)
+    a = experiments.evaluate_coreset(cfg, ctx, split, "experts_full", 60, 0)
+    y_bad = np.random.default_rng(0).permutation(split.y_test)
+    b = experiments.evaluate_coreset(cfg, ctx, dataclasses.replace(split, y_test=y_bad), "experts_full", 60, 0)
+    assert len(fits) == 2 and all(np.array_equal(x, y) for x, y in zip(fits[0], fits[1]))
+    assert all(np.array_equal(x, y) for x, y in zip(plans[0].contexts, plans[1].contexts))
+    assert all(c.max() < len(pool) for c in plans[0].contexts)
+    assert [m for m, _, _ in a] == ["experts_full", "experts_full+heuristic", "experts_full+hard"] == [m for m, _, _ in b]
+    assert a[0][1] != b[0][1]  # only the scores change with the test labels
+
+
+def test_fit_gate_wide_grid_reaches_nearest_expert_routing():
+    rng = np.random.default_rng(5)
+    d, L, _ = _gate_toy(rng, good=6.0)  # the home expert is far better: the sharper the gate the better
+    narrow = cs.fit_gate(d, L, tau0=50.0)
+    wide = cs.fit_gate(d, L, tau0=50.0, grid=cs.GATE_TAU_GRID_WIDE)
+    assert narrow["tau"] == pytest.approx(0.5) and wide["tau"] < narrow["tau"] and wide["loss"] < narrow["loss"]
+    assert set(np.round(np.log10(cs.GATE_TAU_GRID), 6)) <= set(np.round(np.log10(cs.GATE_TAU_GRID_WIDE), 6))

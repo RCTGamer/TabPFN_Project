@@ -89,6 +89,20 @@ python -m tabpfn_lab.cli analyze --csv results/tables/perest_dev.csv   # dev tab
 - Local: `local_mix_r<R>` for each R in `local_ratios`. The test rows are grouped by their features (never their
   labels), and each group gets contexts with a share R of rows near it. These rows are flagged `transductive`.
 - Experts: `cluster_experts`, plus `cluster_experts+gate` with per-test-row estimator weights.
+- Fitted gate (`configs/perest_gate.yaml`, a separate run): `cluster_experts_tuned` keeps a slice of the training rows
+  (`val_fraction`, at most `val_max`) out of every expert's context, predicts it with every expert and fits the gate
+  on it: the temperature by grid search, and for the `+bias` row a per-expert offset too. Classification minimises the
+  log loss of the gated mixture, regression the squared error of its mean. `+heuristic` is the same experts with the
+  untuned gate. Only training labels are used and a row's weights depend on that row alone, so the rows are not
+  `transductive`. Each cell logs a `gate fit` line with the fitted temperature (as a multiple of the heuristic one),
+  the held-out losses, and `nearest_is_best`, the share of held-out rows whose nearest expert is also the best one.
+- Local experts (`configs/perest_experts_large.yaml`, a separate run): the training rows are clustered into about
+  `n_train / budget` clusters (at most `max_clusters`) instead of one per estimator, and a row is predicted by the 8
+  experts nearest its own nearest centre, with the gate temperature fitted on held-out training rows.
+  `experts_scaled` is that alone; `experts_weighted` clusters in a feature space scaled by a random forest's
+  importances (training labels); `experts_overlap` uses twice as many clusters so the contexts overlap;
+  `experts_full` does both. Each also writes `+heuristic` (untuned gate) and `+hard` (nearest expert only). Not
+  `transductive`. One model fit per centre with rows routed to it; each cell logs an `expert fit` line.
 - CRUMB (`configs/perest_crumb.yaml`, a separate run): `crumb` groups the test features with k-means, then picks one
   1024-row context per group by kernel herding (greedy MMD matching to the group; RBF kernel, median-heuristic
   bandwidth), shared by all 8 estimators. `crumb_perest` herds once per estimator from a random 70% of the training
@@ -110,7 +124,7 @@ TabPFN 9.0.0 needs a one-time licence acceptance before it downloads weights. Lo
 | `experiments.py` | `run_aggregation`, `run_coreset`, `tune_coreset` (dev only), caching/resume/sharding |
 | `metrics.py`, `stats.py`, `effect.py`, `sizes.py`, `validate.py` | scoring, dataset-level paired statistics and Holm, effect sizes and power, size tiers and budgets, schema validation |
 | `estimator.py` | `TabPFNLabClassifier` / `TabPFNLabRegressor`, scikit-learn estimators for external benchmarks |
-| `cli.py` | `aggregation`, `coreset`, `analyze`, `merge`, `validate`, `plan` |
+| `cli.py` | `aggregation`, `coreset`, `scaling`, `analyze`, `merge`, `validate`, `plan`, `datasets` (load every dataset of a config and print what was loaded) |
 
 ## Adding a method
 

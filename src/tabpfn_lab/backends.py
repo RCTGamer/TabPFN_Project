@@ -199,6 +199,7 @@ class RegOutputs:
 class Backend(ABC):
     name: str = "backend"
     accepts_raw = False  # True if the backend can take DataFrames / strings directly
+    uses_gpu = False  # False: timing rows say "cpu" with no GPU memory, even when torch is loaded in the process
 
     @abstractmethod
     def params(self) -> dict:
@@ -486,6 +487,7 @@ class TabPFNBackend(Backend):
             raise ValueError(f"unknown TabPFN version {version!r}; choose from {sorted(_VERSION_MAP)}")
         self.version = str(version)
         self.device = device
+        self.uses_gpu = not str(device).startswith("cpu")
         self.fit_mode = fit_mode
         self.inference_precision = inference_precision
         self.extra = extra

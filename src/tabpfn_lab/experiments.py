@@ -57,6 +57,25 @@ DEFAULT_REG_AGGREGATORS = ["mixture", "log_pool", "quantile_mean", "quantile_med
 LOCAL_PREFIX = "local_mix_r"
 TRANSDUCTIVE = "transductive"
 GATED = {"cluster_experts"}  # per-estimator methods that also get a `+gate` row (per-test-row estimator weights)
+# `cluster_experts` with a slice of the training rows kept out of every context; the gate is fitted on that slice
+# (training labels only). Main row: fitted temperature. `+bias`: plus a per-expert offset. `+heuristic`: the same
+# experts with the untuned gate of `cluster_experts+gate`, to separate the tuning from the smaller context pool.
+TUNED_GATE = "cluster_experts_tuned"
+TUNED_GATE_ROWS = ["+bias", "+heuristic"]
+# Local experts with a fitted gate: the training rows are clustered into about coverage * n_train / budget clusters
+# (at most `max_clusters`), each with its own context. A row is predicted by the n_estimators experts nearest its own
+# nearest centre, blended by a gate whose temperature is fitted on held-out training rows. Routing uses the row's own
+# features, so these are not transductive. One model fit per centre that has rows routed to it.
+# `weighted` clusters in a feature space scaled by supervised importance (training labels). `coverage` 2 halves the
+# clusters, so each context reaches into its neighbours and the contexts overlap.
+EXPERT_VARIANTS = {
+    "experts_scaled": {"weighted": False, "coverage": 1.0},
+    "experts_weighted": {"weighted": True, "coverage": 1.0},
+    "experts_overlap": {"weighted": False, "coverage": 2.0},
+    "experts_full": {"weighted": True, "coverage": 2.0},
+}
+# extra rows per variant: `+heuristic` is the untuned gate, `+hard` gives all the weight to the nearest expert
+EXPERT_ROWS = ["+heuristic", "+hard"]
 
 
 def is_transductive(method: str) -> bool:
@@ -359,6 +378,14 @@ def _score(split: Split, pred, levels) -> dict:
 # --------------------------------------------------------------------------- generic runner
 
 
+def _gpu_peak(backend) -> float:
+    return gpu_peak_mb() if backend.uses_gpu else float("nan")
+
+
+def _device_name(backend) -> str:
+    return (gpu_name() if backend.uses_gpu else "") or "cpu"
+
+
 def _append(path: Path, rows: list[dict]) -> None:
     if not rows:
         return
@@ -411,7 +438,7 @@ def _run_cells(cfg, ctx: Context, cells: list[Cell], run_cell, shard, meta: dict
             log.error("cell %d/%d FAILED %s: %s: %s\n%s", k + 1, len(cells), cell.id, type(e).__name__, e, traceback.format_exc(limit=3))
             continue
         _append(csv, rows)
-        log.info("cell %d/%d %s rows=%d wall=%.2fs peak_gpu_mb=%.0f", k + 1, len(cells), cell.id, len(rows), time.time() - t0, gpu_peak_mb())
+        log.info("cell %d/%d %s rows=%d wall=%.2fs peak_gpu_mb=%.0f", k + 1, len(cells), cell.id, len(rows), time.time() - t0, _gpu_peak(ctx.backend))
     meta["backend_meta"] = ctx.backend_meta
     meta["split_hashes"] = ctx.split_hashes
     _write_meta(csv, meta)
@@ -546,6 +573,10 @@ def coreset_methods_by_task(cfg) -> dict[str, list[str]]:
                 ms.append(f"{m}_corrected")
             if m in GATED:
                 ms.append(f"{m}+gate")
+            if m == TUNED_GATE:
+                ms += [f"{m}{x}" for x in TUNED_GATE_ROWS]
+            if m in EXPERT_VARIANTS:
+                ms += [f"{m}{x}" for x in EXPERT_ROWS]
             if m in cs.PER_ESTIMATOR_METHODS or is_transductive(m):
                 ms += [f"{m}+{a}" for a in cfg["combined_aggregators"]]
         out[task] = ["full", *ms] if "full" not in ms else ms
@@ -608,27 +639,124 @@ def _stack_outputs(outs: list, task):
     return RegOutputs(np.concatenate(probs), ref, outs[0].y_mean, outs[0].y_std, outs[0].meta)
 
 
-def _local_outputs(cfg, ctx: Context, split: Split, groups, tag: str, E: int, seed: int):
-    """One E-estimator fit per test-feature group (from a routing function: [(test_rows, subsets)]), each on its own
-    per-estimator contexts and evaluated on that group's test rows only; outputs are put back into test-row order."""
-    X, y = split.X_train, split.y_train
-    parts = []
+def _local_outputs(cfg, ctx: Context, split: Split, groups, tag: str, E: int, seed: int, X_eval=None, train=None):
+    """One E-estimator fit per group of evaluation rows (from a routing function: [(rows, subsets)]), each on its own
+    per-estimator contexts and evaluated on that group's rows only; outputs are put back into row order.
+
+    The rows are the split's test rows unless `X_eval` is given; the fit is on the training split unless `train`
+    (X, y) is given, and the subsets index into it."""
+    X, y = (split.X_train, split.y_train) if train is None else train
+    X_eval = split.X_test if X_eval is None else X_eval
+    n_eval = len(X_eval)
+    first = merged = None  # filled group by group, so only one group's outputs are held next to the merged array
     for g, (rows, subsets) in enumerate(groups):
         tag_g = f"{tag}:G{cfg['local_groups']}:g{g}"
-        o = ctx.outputs(split, X, y, E, seed, tag_g, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]}, X_eval=split.X_test[rows])
-        parts.append((rows, o))
-    first = parts[0][1]
+        o = ctx.outputs(split, X, y, E, seed, tag_g, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]}, X_eval=X_eval[rows])
+        if first is None:
+            first = o
+            merged = np.empty((E, n_eval, o.logits.shape[2] if split.task == "classification" else o.dist.n_bins))
+        if split.task == "classification":
+            merged[:, rows] = o.logits
+        else:
+            same = np.array_equal(o.dist.borders, first.dist.borders)
+            merged[:, rows] = o.probs if same else translate_probs(o.probs, o.dist.borders, first.dist.borders)
     if split.task == "classification":
-        logits = np.empty((E, split.n_test, first.logits.shape[2]))
-        for rows, o in parts:
-            logits[:, rows] = o.logits
-        return ClfOutputs(logits, first.temperature, first.classes, first.meta)
-    ref = first.dist
-    probs = np.empty((E, split.n_test, ref.n_bins))
-    for rows, o in parts:
-        same = np.array_equal(o.dist.borders, ref.borders)
-        probs[:, rows] = o.probs if same else translate_probs(o.probs, o.dist.borders, ref.borders)
-    return RegOutputs(probs, ref, first.y_mean, first.y_std, first.meta)
+        return ClfOutputs(merged, first.temperature, first.classes, first.meta)
+    return RegOutputs(merged, first.dist, first.y_mean, first.y_std, first.meta)
+
+
+def _perest_outputs(cfg, ctx: Context, split: Split, X, y, subsets, tag: str, E: int, seed: int, X_eval=None):
+    if cfg["perest_mode"] == "single_fit":
+        return ctx.outputs(split, X, y, E, seed, tag, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]}, X_eval=X_eval)
+    outs = [ctx.outputs(split, X[s], y[s], 1, seed * 1000 + e, f"{tag}:{e}", X_eval=X_eval) for e, s in enumerate(subsets)]
+    return _stack_outputs(outs, split.task)
+
+
+def _gate_scores(out, y, task):
+    """What `fit_gate` needs from the experts' outputs on held-out training rows: (score (E, n), y or None)."""
+    if task == "classification":
+        P = agg.per_estimator_proba(out.logits, out.temperature)
+        return np.log(np.clip(P[:, np.arange(len(y)), np.asarray(y, int)], 1e-300, None)), None
+    with np.errstate(divide="ignore"):
+        return out.dist.mean(np.log(np.asarray(out.probs, np.float64))), np.asarray(y, np.float64)
+
+
+def _tuned_gate_results(cfg, ctx: Context, split: Split, budget: int, seed: int, kw: dict):
+    """`cluster_experts_tuned`: experts on the training rows outside a held-out slice, gate fitted on that slice."""
+    task, X, y = split.task, split.X_train, split.y_train
+    E = max(_n_estimators_list(cfg))
+    levels = cfg["quantile_levels"]
+    ridge = float(kw.pop("ridge", 1e-3))
+    pool, val = cs.gate_holdout(y, seed, task, **kw)
+    Xp, yp = X[pool], y[pool]
+    subsets = cs.per_estimator_subsets("cluster_experts", Xp, yp, budget, E, seed, task)
+    tag = f"{TUNED_GATE}:{budget}:{json.dumps(kw, sort_keys=True)}"
+    out = _perest_outputs(cfg, ctx, split, Xp, yp, subsets, tag, E, seed)
+    out_val = _perest_outputs(cfg, ctx, split, Xp, yp, subsets, f"{tag}:val", E, seed, X_eval=X[val])
+    (d_test, d_val), tau0 = cs.cluster_gate_distances(Xp, [split.X_test, X[val]], E, seed)
+    score, y_val = _gate_scores(out_val, y[val], task)  # training labels of the held-out slice, never test labels
+    fits = {"": cs.fit_gate(d_val, score, tau0, y=y_val), "+bias": cs.fit_gate(d_val, score, tau0, y=y_val, bias=True, ridge=ridge)}
+    log.info(
+        "gate fit %s seed=%d n_val=%d nearest_is_best=%.3f tau_mult=%.3g (+bias %.3g) val_loss heuristic=%.5f tuned=%.5f +bias=%.5f",
+        split.name, seed, len(val), fits[""]["nearest_is_best"], fits[""]["tau"] / tau0, fits["+bias"]["tau"] / tau0,
+        fits[""]["loss_heuristic"], fits[""]["loss"], fits["+bias"]["loss"],
+    )  # fmt: skip
+    weights = {k: cs.gate_weights(d_test, f["tau"], f["bias"]) for k, f in fits.items()}
+    weights["+heuristic"] = cs.gate_weights(d_test, tau0)
+    results = []
+    for k, w in weights.items():
+        if task == "classification":
+            P = agg.agg_sample_weighted(out.logits, out.temperature, w=w)
+        else:
+            P = agg.agg_sample_weighted_mixture(out.probs, out.dist, levels, w=w)
+        results.append((f"{TUNED_GATE}{k}", _score(split, P, levels), "method"))
+    return results
+
+
+def _output_rows(out, rows, task):
+    if task == "classification":
+        return ClfOutputs(out.logits[:, rows], out.temperature, out.classes, out.meta)
+    return RegOutputs(out.probs[:, rows], out.dist, out.y_mean, out.y_std, out.meta)
+
+
+def _expert_results(cfg, ctx: Context, split: Split, method: str, budget: int, seed: int, kw: dict):
+    """`EXPERT_VARIANTS`: local experts on the training rows outside a held-out slice, gate fitted on that slice.
+    Each model fit predicts the test rows and the held-out rows routed to its centre in one call."""
+    task, X, y = split.task, split.X_train, split.y_train
+    E = max(_n_estimators_list(cfg))
+    levels = cfg["quantile_levels"]
+    max_clusters = int(kw.pop("max_clusters", 128))
+    pool, val = cs.gate_holdout(y, seed, task, **kw)
+    Xp, yp = X[pool], y[pool]
+    plan = cs.expert_plan(Xp, yp, budget, E, seed, task, max_clusters=max_clusters, **EXPERT_VARIANTS[method])
+    n_test = split.n_test
+    X_all = np.concatenate([split.X_test, X[val]])  # features only; the labels of the test rows are never used
+    home, d = cs.expert_route(plan, X_all)
+    groups = [(np.flatnonzero(home == g), [plan.contexts[j] for j in plan.neighbours[g]]) for g in np.unique(home)]
+    tag = f"{method}:{budget}:K{len(plan.centres)}:{json.dumps(kw, sort_keys=True)}"
+    out_all = _local_outputs(cfg, ctx, split, groups, tag, E, seed, X_eval=X_all, train=(Xp, yp))
+    out = _output_rows(out_all, slice(0, n_test), task)
+    d_test, d_val = d[:, :n_test], d[:, n_test:]
+    score, y_val = _gate_scores(_output_rows(out_all, slice(n_test, None), task), y[val], task)
+    fit = cs.fit_gate(d_val, score, plan.tau0, y=y_val, grid=cs.GATE_TAU_GRID_WIDE)
+    hard_val = np.zeros_like(d_val)
+    hard_val[d_val.argmin(axis=0), np.arange(d_val.shape[1])] = 1.0
+    log.info(
+        "expert fit %s %s seed=%d clusters=%d fits=%d n_val=%d nearest_is_best=%.3f tau_mult=%.3g val_loss heuristic=%.5f tuned=%.5f hard=%.5f",
+        method, split.name, seed, len(plan.centres), len(groups), len(val), fit["nearest_is_best"], fit["tau"] / plan.tau0,
+        fit["loss_heuristic"], fit["loss"], cs._gate_objective(hard_val, np.maximum(score, -50.0) if y_val is None else score, y_val)[0],
+    )  # fmt: skip
+    hard = np.zeros_like(d_test)
+    hard[d_test.argmin(axis=0), np.arange(n_test)] = 1.0
+    weights = {"": cs.gate_weights(d_test, fit["tau"]), "+heuristic": cs.gate_weights(d_test, plan.tau0), "+hard": hard}
+    results = []
+    for k, w in weights.items():
+        if task == "classification":
+            P = agg.agg_sample_weighted(out.logits, out.temperature, w=w)
+        else:
+            P = agg.agg_sample_weighted_mixture(out.probs, out.dist, levels, w=w)
+        results.append((f"{method}{k}", _score(split, P, levels), "method"))
+    return results
 
 
 def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, seed: int, kwargs=None):
@@ -644,6 +772,10 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
     kw = dict(kwargs if kwargs is not None else (cfg["coreset_kwargs"].get(method, {}) or {}))
     aggregator = cfg["aggregator"] if task == "classification" else "mixture"
     idx = None
+    if method == TUNED_GATE:
+        return _tuned_gate_results(cfg, ctx, split, budget, seed, kw)
+    if method in EXPERT_VARIANTS:
+        return _expert_results(cfg, ctx, split, method, budget, seed, kw)
     if method == "full":
         out = ctx.outputs(split, X, y, E, seed, "full")
     elif method in BUILTIN_METHODS:
@@ -662,11 +794,7 @@ def evaluate_coreset(cfg, ctx: Context, split: Split, method: str, budget: int, 
     elif method in cs.PER_ESTIMATOR_METHODS:
         subsets = cs.per_estimator_subsets(method, X, y, budget, E, seed, task, **kw)
         tag = f"{method}:{budget}" + (f":{json.dumps(kw, sort_keys=True)}" if kw else "")
-        if cfg["perest_mode"] == "single_fit":
-            out = ctx.outputs(split, X, y, E, seed, tag, overrides={"SUBSAMPLE_SAMPLES": [np.sort(s) for s in subsets]})
-        else:
-            outs = [ctx.outputs(split, X[s], y[s], 1, seed * 1000 + e, f"{tag}:{e}") for e, s in enumerate(subsets)]
-            out = _stack_outputs(outs, task)
+        out = _perest_outputs(cfg, ctx, split, X, y, subsets, tag, E, seed)
     elif method == CANARY:
         idx = cs.select_coreset("random", X, y, budget, seed, task)
         y_bad = np.random.default_rng([seed, 999]).permutation(y[idx])
@@ -728,7 +856,7 @@ def _coreset_cell(cfg, ctx: Context, cell: Cell) -> list[dict]:
             "split_seed": int(cell.split_seed), "seed": int(cell.seed), "budget": int(cell.budget), "budget_key": cell.budget_key,
             "n_train": int(split.n_train), "n_test": int(split.n_test), "n_features": int(split.X_train.shape[1]), "n_estimators": int(E),
             "fit_seconds": c["fit_seconds"], "predict_seconds": c["predict_seconds"], "total_seconds": total,
-            "peak_gpu_mb": gpu_peak_mb(), "device_name": gpu_name() or "cpu", "hostname": socket.gethostname(),
+            "peak_gpu_mb": _gpu_peak(ctx.backend), "device_name": _device_name(ctx.backend), "hostname": socket.gethostname(),
             "method": cell.method, "n_fits": c["n_fits"], "selection_seconds": max(0.0, total - c["fit_seconds"] - c["predict_seconds"]),
         }
         ctx.timing_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -867,8 +995,8 @@ def _scaling_cell(cfg, ctx: Context, cell: Cell, timing_csv: Path) -> list[dict]
         "fit_seconds": t.get("fit_seconds", float("nan")),
         "predict_seconds": t.get("predict_seconds", float("nan")),
         "total_seconds": total,
-        "peak_gpu_mb": gpu_peak_mb(),
-        "device_name": out.meta.get("device_name", "") or gpu_name() or "cpu",
+        "peak_gpu_mb": _gpu_peak(ctx.backend),
+        "device_name": out.meta.get("device_name", "") or _device_name(ctx.backend),
         "hostname": socket.gethostname(),
     }
     # written before the results rows: a crash in between leaves a timing row whose cell reruns (read_timing keeps the last)

@@ -118,3 +118,26 @@ def test_budget_larger_than_n_train(coreset_run):
     i = bad.index[bad["method"] == "stratified"][0]
     bad.loc[i, "budget"] = bad.loc[i, "n_train"] + 5
     assert _has(_check(bad, meta), "budget > n_train")[0]
+
+
+def test_describe_datasets_flags_wrong_task_and_small_data():
+    from tabpfn_lab import cli
+
+    syn = {"source": "synthetic", "n_features": 4, "data_seed": 1}
+    cfg = {
+        "datasets": {
+            "dev": [
+                {"name": "ok_clf", "task": "classification", "n": 600, "n_classes": 3, **syn},
+                {"name": "ok_reg", "task": "regression", "n": 600, **syn},
+                {"name": "small", "task": "classification", "n": 150, **syn},
+                {"name": "missing", "source": "nope", "task": "classification"},
+            ],
+            "confirm": [],
+        },
+        "budget_absolute": [100],
+    }
+    t = cli.describe_datasets(cfg).set_index("dataset")
+    assert t.loc["ok_clf", "problem"] == "" and t.loc["ok_reg", "problem"] == ""
+    assert t.loc["ok_clf", "rows"] == 600 and t.loc["ok_clf", "n_train"] == 420 and t.loc["ok_clf", "target"].startswith("3 classes")
+    assert "dropped" in t.loc["small", "problem"] and "ValueError" in t.loc["missing", "problem"]
+    assert cli.main(["datasets", "--config", "configs/smoke.yaml"]) == 0

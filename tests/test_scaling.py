@@ -111,3 +111,17 @@ def test_analyze_scaling_steps(tmp_path):
     assert set(zip(est["n_estimators_from"], est["n_estimators_to"])) == {(1, 2), (2, 4)}
     assert (est["n_seeds"] == 2).all()
     assert isinstance(pd.read_csv(csv.with_name("scaling_t.analysis.context_steps.csv")), pd.DataFrame)
+
+
+def test_cpu_backend_timing_ignores_a_loaded_torch(tmp_path, monkeypatch):
+    """On the GPU server the tabpfn tests load torch into the same process; a sklearn run must still report cpu."""
+    import sys
+    import types
+
+    cuda = types.SimpleNamespace(
+        is_available=lambda: True, max_memory_allocated=lambda: 8 * 2**20, reset_peak_memory_stats=lambda: None,
+        get_device_name=lambda i: "Fake GPU", current_device=lambda: 0, synchronize=lambda: None,
+    )  # fmt: skip
+    monkeypatch.setitem(sys.modules, "torch", types.SimpleNamespace(cuda=cuda))
+    timing = read_timing(timing_path(run_scaling(_cfg(tmp_path))))
+    assert (timing["device_name"] == "cpu").all() and timing["peak_gpu_mb"].isna().all()
