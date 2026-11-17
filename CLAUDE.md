@@ -21,7 +21,77 @@ Facts from finished runs, not instructions. Append each new run: config, runs pe
 All runs so far: TabPFN 3.5 on one RTX A6000, **dev datasets only** (exploratory; the methods were designed after
 looking at these datasets, so nothing here is a confirmed claim). 8 estimators, 1024 rows per context, baseline
 `perest_random`. Lower is better: log loss for classification, RMSE for regression; values are means over runs.
-Not recorded here yet: the `perest_dev`, `perest_crumb`, `scaling_*` and aggregation runs.
+Not recorded yet: the aggregation runs and `perest_shared`. Runs A-D below are from before runs 1-3; A is not an
+8 x 1024 run. Results live on the A6000 server under `results/` (git-ignored): `tables/<name>.csv`,
+`<name>.timing.csv`, `<name>.meta.json`, `<name>.failures.csv`, `<name>.analysis.*.csv`, and `logs/<name>.log`.
+
+### A. `scaling_dev.yaml` as `scaling_a6000` (2026-10-28, 5 runs per dataset): context size x estimator count
+
+Random nested contexts 512, 1024, 2048, ... up to all training rows, crossed with E = 1, 2, 4, 8; each cell its own
+timed fit. Datasets (70/30 split): phoneme 3,782 train rows x 5 features, houses 14,448 x 8, electricity 31,718 x 8,
+higgs 68,635 x 28.
+
+| dataset | 512 rows, E=1 | full, E=1 | full, E=8 | seconds full E=1 / E=8 |
+|---|---|---|---|---|
+| electricity | 0.431 | 0.081 | 0.076 | 3.5 / 18.4 |
+| higgs | 0.593 | 0.502 | 0.501 | 10.3 / 71.6 |
+| houses | 51,133 | 37,559 | 37,187 | 2.1 / 8.0 |
+| phoneme | 0.330 | 0.181 | 0.178 | 1.6 / 2.5 |
+
+- More context beats more estimators at equal time (electricity: E=1 at 16,384 rows 0.125 in 2.3 s vs E=8 at 8,192
+  rows 0.176 in 5.7 s). E beyond 2 adds little; on electricity E=2 was often better than E=8.
+- electricity still improves about 30% per doubling at full size; higgs about 0.01 per doubling.
+- `fit_seconds` is a near-constant 1.6 to 2 s per fit regardless of context size (likely model loading); time grows
+  faster than linearly with context at large sizes (higgs E=8: 29 s at 32,768 rows, 72 s at 65,536).
+- No out-of-memory on the A6000, including higgs full with E=8.
+
+### B. `perest_dev.yaml` (2026-10-29, 9 runs per dataset): per-estimator contexts
+
+| method | electricity | houses | phoneme | seconds (elec / houses / phon) |
+|---|---|---|---|---|
+| perest_random | 0.365 | 44,337 | 0.251 | 4.6 / 22.2 / 3.3 |
+| perest_partition | 0.365 | 44,079 | 0.251 | 4.7 / 22.3 / 3.4 |
+| builtin_subsample | 0.366 | 44,250 | 0.249 | 3.6 / 21.1 / 2.3 |
+| perest_stratified | 0.366 | 44,356 | 0.253 | 4.7 / 21.8 / 3.2 |
+| perest_representative | 0.368 | 44,209 | 0.253 | 4.7 / 21.8 / 3.2 |
+| perest_kcenter | 0.458 | 49,571 | 0.323 | 9.9 / 22.3 / 4.0 |
+| cluster_experts | 0.457 | 54,658 | 0.353 | 5.9 / 38.6 / 3.7 |
+| cluster_experts+gate | 0.260 | 43,264 | 0.184 | (same cell) |
+| local_mix_r0.5 | 0.282 | 43,305 | 0.211 | 18.2 / 36.1 / 16.8 |
+| local_mix_r0.75 | 0.263 | 43,378 | 0.212 | 18.5 / 35.4 / 16.4 |
+| local_mix_r0.9 | 0.258 | 43,695 | 0.215 | 17.8 / 36.3 / 16.2 |
+| local_mix_r1 | 0.263 | 44,363 | 0.217 | 17.9 / 35.9 / 16.7 |
+| full | 0.077 | 37,427 | 0.178 | 20.8 / 25.6 / 2.7 |
+
+- All random-like variants (partition, builtin, stratified, representative) equal perest_random.
+- kcenter hurts everywhere: farthest-point covers pick outliers and distort the row distribution.
+- local_mix helps on all three; some random share is safer (houses: r0.5 gains, r1 none).
+- cluster_experts+gate is best or equal-best and costs one fit; local_mix costs 8 fits (one per test group, about
+  2 s fixed each), which dominates its time on phoneme.
+- houses `cluster_experts` is slow only because its cell scores two regression rows (plain and gate); see the
+  scoring note under "Harness checks".
+
+### C. `perest_crumb.yaml` (2026-10-30, 9 runs per dataset): CRUMB recreation
+
+perest_random and full match run B exactly (same splits and seeds), so B and C are directly comparable.
+
+| method | electricity | houses | phoneme | seconds (elec / houses / phon) | gap closed (elec / houses / phon) |
+|---|---|---|---|---|---|
+| crumb | 0.234 | 43,584 | 0.177 | 25.3 / 43.0 / 22.6 | 45% / 11% / 101% |
+| crumb_perest | 0.200 | 41,816 | 0.196 | 36.2 / 48.9 / 23.7 | 57% / 36% / 75% |
+| (B) cluster_experts+gate | 0.260 | 43,264 | 0.184 | 5.9 / 38.6 / 3.7 | 37% / 16% / 91% |
+
+- CRUMB beats local_mix on all three; crumb_perest is best on electricity and houses, crumb matches full on phoneme
+  (with 3.8k train rows, crumb_perest's 70% candidate subsample removes useful rows).
+- Costliest method: 8 fits plus herding (about 30 to 40 s of CPU per electricity cell). Both CRUMB rows are
+  transductive.
+- On these datasets `full` beats every 8 x 1024 method in quality and time (phoneme: equal quality, 8x faster).
+
+### D. `scripts/resample_test.py` (2026-11, phoneme, 5 seeds, E = 1 and 8): duplicated or bootstrapped context
+
+Training split inflated to 4x by exact duplication (`dup4`) or bootstrap (`boot4`), plus a same-size bootstrap
+control (`boot1`), against the plain training set. Result as reported: no improvement over `full`; inflating the
+context only added time. Numbers not logged here (rerun the script to print the table).
 
 ### 1. `perest_gate.yaml` (2026-11-16, 9 runs per dataset): gate temperature fitted on held-out training rows
 
@@ -99,3 +169,13 @@ Not recorded here yet: the `perest_dev`, `perest_crumb`, `scaling_*` and aggrega
   the nearest centre. This is `cluster_experts` with hard routing and a scaled cluster count.
 - QCOC (arXiv 2610.11784): retrieval in a learned embedding space did no better than standardised raw features;
   most of CRUMB's gain came from grouping the queries rather than from the herding.
+
+## Viewing a run (on the server, repo root, `.venv` active)
+- Status: `pgrep -u $USER -af tabpfn_lab.cli`; `tail -2 results/logs/<name>.log`;
+  `python -m tabpfn_lab.cli validate --csv results/tables/<name>.csv`.
+- Tables: `python -m tabpfn_lab.cli analyze --csv results/tables/<name>.csv`. Scaling writes `.analysis.summary.csv`,
+  `.analysis.context_steps.csv`, `.analysis.estimator_steps.csv`; perest runs write `.analysis.dev.csv` (paired vs
+  the config's baseline, Holm-adjusted, with mean seconds).
+- Compare perest runs by concatenating their `.analysis.dev.csv` files (same splits and seeds give identical
+  perest_random and full rows). Cost: group `<name>.timing.csv` by dataset and method over fit, predict, selection
+  and total seconds and n_fits.
