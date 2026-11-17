@@ -8,6 +8,7 @@ Expensive internals are capped by `budget`/`pilot`/`max_clusters`, never by n, s
 from __future__ import annotations
 
 import warnings
+from dataclasses import dataclass
 from functools import partial
 
 import numpy as np
@@ -481,6 +482,7 @@ def cluster_gate(X_train, X_test, n_estimators, seed) -> np.ndarray:
 
 
 GATE_TAU_GRID = np.logspace(-2, 2, 41)  # multipliers of the heuristic temperature tried by `fit_gate`
+GATE_TAU_GRID_WIDE = np.logspace(-4, 2, 61)  # same steps, reaching down to nearest-expert routing
 
 
 def _gate_objective(w, score, y=None):
@@ -502,12 +504,13 @@ def gate_loss(d, score, tau, bias=None, y=None) -> float:
     return _gate_objective(gate_weights(d, tau, bias), score, y)[0]
 
 
-def fit_gate(d, score, tau0, y=None, bias=False, ridge=1e-3) -> dict:
+def fit_gate(d, score, tau0, y=None, bias=False, ridge=1e-3, grid=None) -> dict:
     """Fit the gate on held-out *training* rows. `d` (E, n): squared distances to the expert centres. `score` (E, n):
     each expert's log-likelihood of the row's training label (classification), or with `y` its predicted mean, the
     gate then minimising the squared error of the mixture mean (regression); see `_gate_objective`.
 
-    The temperature is a grid search over `GATE_TAU_GRID * tau0` (ties go to the multiplier nearest 1). With `bias`,
+    The temperature is a grid search over `grid * tau0`, `grid` defaulting to `GATE_TAU_GRID` (ties go to the
+    multiplier nearest 1). With `bias`,
     a per-expert offset is then fitted jointly with the temperature (L-BFGS, ridge penalty on the offsets), starting
     from the grid solution. Returns {"tau", "bias", "loss", "loss_heuristic", "nearest_is_best"}.
     """
@@ -520,11 +523,12 @@ def fit_gate(d, score, tau0, y=None, bias=False, ridge=1e-3) -> dict:
         y = np.asarray(y, np.float64)
         best_expert = np.abs(score - y).argmin(axis=0)
     E = d.shape[0]
-    losses = np.array([gate_loss(d, score, m * tau0, y=y) for m in GATE_TAU_GRID])
+    grid = GATE_TAU_GRID if grid is None else np.asarray(grid, np.float64)
+    losses = np.array([gate_loss(d, score, m * tau0, y=y) for m in grid])
     best = np.flatnonzero(losses <= losses.min() + 1e-12)
-    k = best[np.argmin(np.abs(np.log(GATE_TAU_GRID[best])))]
+    k = best[np.argmin(np.abs(np.log(grid[best])))]
     res = {
-        "tau": float(GATE_TAU_GRID[k] * tau0),
+        "tau": float(grid[k] * tau0),
         "bias": None,
         "loss": float(losses[k]),
         "loss_heuristic": gate_loss(d, score, tau0, y=y),
@@ -544,7 +548,7 @@ def fit_gate(d, score, tau0, y=None, bias=False, ridge=1e-3) -> dict:
         grad = np.concatenate([[(g * dd).sum() * np.exp(-s)], g.sum(axis=1) + 2 * ridge * b])
         return loss + ridge * float(b @ b), grad
 
-    lo, hi = np.log(GATE_TAU_GRID[0] * tau0), np.log(GATE_TAU_GRID[-1] * tau0)
+    lo, hi = np.log(grid[0] * tau0), np.log(grid[-1] * tau0)
     opt = minimize(objective, np.concatenate([[np.log(res["tau"])], np.zeros(E)]), jac=True, method="L-BFGS-B", bounds=[(lo, hi)] + [(-10, 10)] * E)
     tau, b = float(np.exp(opt.x[0])), opt.x[1:]
     loss = gate_loss(d, score, tau, b, y=y)
@@ -580,6 +584,111 @@ PER_ESTIMATOR_METHODS = {
     "perest_kcenter": sub_perest_kcenter,
     "cluster_experts": sub_cluster_experts,
 }
+
+
+# --------------------------------------------------------------------------- local experts (routed by own features)
+
+
+def _sq_dists(F, C) -> np.ndarray:
+    """(len(C), len(F)) squared Euclidean distances, without a (K, n, dim) intermediate."""
+    F = np.asarray(F, np.float64)
+    C = np.asarray(C, np.float64)
+    d = (C**2).sum(axis=1)[:, None] + (F**2).sum(axis=1)[None, :] - 2.0 * (C @ F.T)
+    return np.maximum(d, 0.0)
+
+
+def supervised_feature_scale(F, y, task, seed, max_rows=5000, n_trees=50, floor=0.1) -> np.ndarray:
+    """Per-feature scale that turns squared distance into an importance-weighted one: sqrt(dim * importance).
+
+    Importances come from a random forest fitted on a capped sample of the rows and labels it is given (callers pass
+    training rows), mixed with a share `floor` of uniform so no feature vanishes. The squared scales average 1, so
+    distances stay on the scale of the unweighted space."""
+    from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+
+    F = np.asarray(F, np.float64)
+    y = np.asarray(y)
+    dim = F.shape[1]
+    rows = np.random.default_rng([int(seed), 707]).choice(len(F), min(len(F), int(max_rows)), replace=False)
+    forest_cls = RandomForestClassifier if task == "classification" else RandomForestRegressor
+    forest = forest_cls(n_estimators=int(n_trees), min_samples_leaf=5, max_features="sqrt", random_state=int(seed), n_jobs=1)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        imp = np.asarray(forest.fit(F[rows], y[rows]).feature_importances_, np.float64)
+    if not np.isfinite(imp).all() or imp.sum() <= 0:
+        imp = np.full(dim, 1.0 / dim)
+    imp = (1.0 - floor) * imp / imp.sum() + floor / dim
+    return np.sqrt(dim * imp)
+
+
+@dataclass
+class ExpertPlan:
+    """Local experts built from training rows: k-means centres, one context per centre, and for every centre the
+    centres nearest to it (itself first), i.e. the experts that predict the rows whose nearest centre it is."""
+
+    space: object  # callable: raw rows -> the feature space the centres live in
+    centres: np.ndarray  # (K, dim)
+    contexts: list  # K index arrays into the rows the plan was built from
+    neighbours: np.ndarray  # (K, n_estimators) centre ids
+    tau0: float  # heuristic gate temperature: median squared distance of a row to its own centre
+    scale: np.ndarray | None  # per-feature scale applied before clustering (None: unweighted)
+
+
+def expert_plan(X, y, budget, n_estimators, seed, task, weighted=False, coverage=1.0, max_clusters=128) -> ExpertPlan:
+    """Cluster the rows it is given (callers pass training rows) into about coverage * n / budget clusters, at least
+    `n_estimators` and at most `max_clusters`, and build one `budget`-row context per cluster: `budget` random rows
+    of the cluster, or all of them topped up with the nearest rows of other clusters (as in `cluster_experts`).
+
+    `coverage` 1 gives clusters of about `budget` rows. With 2 they hold about half that, so every context reaches
+    into the neighbouring clusters and a row near a cluster border has its neighbours in one context.
+    `weighted`: cluster in the space scaled by `supervised_feature_scale` (uses y), so features that say nothing
+    about the target stop deciding what is near."""
+    _check_budget(budget)
+    from sklearn.cluster import KMeans
+
+    n = len(X)
+    b = min(int(budget), n)
+    with threadpool_limits(limits=1):
+        T = feature_transform(X, seed)
+        F = T(X)
+        scale = supervised_feature_scale(F, y, task, seed) if weighted else None
+        if scale is not None:
+            F = F * scale
+        K = max(int(n_estimators), min(int(max_clusters), int(np.ceil(coverage * n / b))))
+        fit_rows = np.random.default_rng([int(seed), 404]).choice(n, min(n, max(KMEANS_FIT_ROWS, 50 * K)), replace=False)
+        if K > len(fit_rows):
+            raise ValueError(f"local experts need at least n_estimators={n_estimators} clusters, but there are only {n} rows")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            C = KMeans(n_clusters=K, n_init=3, random_state=int(seed)).fit(F[fit_rows]).cluster_centers_
+        d = _sq_dists(F, C)  # (K, n)
+        labels = d.argmin(axis=0)
+        tau0 = float(np.median(d[labels, np.arange(n)])) or 1.0
+        contexts = []
+        for c, s in enumerate(np.random.SeedSequence([int(seed), 808]).spawn(K)):
+            rng = np.random.default_rng(s)
+            own = np.flatnonzero(labels == c)
+            if len(own) >= b:
+                idx = rng.choice(own, b, replace=False)
+            else:
+                order = np.argsort(d[c], kind="stable")
+                idx = np.concatenate([own, order[labels[order] != c][: b - len(own)]])
+            if task == "classification":
+                idx = _ensure_class_coverage(idx, y, rng, protected=min(len(own), b))
+            contexts.append(np.asarray(idx, dtype=np.int64))
+        dc = _sq_dists(C, C)
+        np.fill_diagonal(dc, -1.0)  # a centre is its own nearest expert
+        neighbours = np.argsort(dc, axis=1, kind="stable")[:, : int(n_estimators)]
+    space = T if scale is None else (lambda Xn: T(Xn) * scale)
+    return ExpertPlan(space, C, contexts, neighbours, tau0, scale)
+
+
+def expert_route(plan: ExpertPlan, X_eval) -> tuple[np.ndarray, np.ndarray]:
+    """(home (n,), d (n_estimators, n)): each row's nearest centre and its squared distances to that centre's
+    experts, `plan.neighbours[home]`, the home centre first. A row is routed by its own features only."""
+    with threadpool_limits(limits=1):
+        D = _sq_dists(plan.space(X_eval), plan.centres)
+    home = D.argmin(axis=0)
+    return home, D[plan.neighbours[home].T, np.arange(D.shape[1])]
 
 
 # --------------------------------------------------------------------------- local contexts (routed by test features)

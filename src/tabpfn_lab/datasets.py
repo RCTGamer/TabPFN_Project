@@ -132,6 +132,7 @@ def _load_cached(key: tuple):
         else:
             bunch = fetch_openml(name=spec["name"], version=spec.get("version", "active"), **kwargs)
         X = dataframe_to_numeric(bunch.data)
+        OPENML_NAMES[spec["name"]] = str((getattr(bunch, "details", None) or {}).get("name", ""))
         y = bunch.target.to_numpy()
         if task == "regression":
             y = y.astype(float)
@@ -148,6 +149,9 @@ def _load_cached(key: tuple):
         X, y = X[sel], y[sel]
     X.setflags(write=False)
     return X, y, task
+
+
+OPENML_NAMES: dict[str, str] = {}  # config name -> the name OpenML gives the data_id that was loaded
 
 
 def load_dataset(spec: dict):
