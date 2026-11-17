@@ -1,0 +1,36 @@
+# The fitted gate on larger datasets (n_train about 16k to 69k), where perest_gate.yaml showed the fixed gate to be
+# too soft. Check the datasets first: the OpenML ids of the new ones were not verified when this file was written.
+#   python -m tabpfn_lab.cli datasets --config configs/perest_gate_large.yaml
+#   python -m tabpfn_lab.cli coreset --config configs/perest_gate_large.yaml
+#   python -m tabpfn_lab.cli analyze --csv results/tables/perest_gate_large.csv
+#   grep "gate fit" results/logs/perest_gate_large.log
+# None of these is a confirm dataset of coreset*.yaml. electricity repeats perest_gate.yaml as an anchor.
+# `full` (the whole training split as context) may run out of GPU memory on the largest ones; those cells go to
+# perest_gate_large.failures.csv and the rest of the run continues.
+name: perest_gate_large
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}      # 45k rows, 8 features, 2 classes
+    - {name: jungle_chess, source: openml, data_id: 41027, task: classification}   # 45k rows, 6 features, 3 classes
+    - {name: jannis, source: openml, data_id: 41168, task: classification}         # 84k rows, 54 features, 4 classes
+    - {name: higgs, source: openml, data_id: 23512, task: classification}          # 98k rows, 28 features, 2 classes
+    - {name: house_16H, source: openml, data_id: 574, task: regression}            # 23k rows, 16 features
+    - {name: fried, source: openml, data_id: 564, task: regression}                # 41k rows, 10 features (synthetic)
+  confirm: []
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: []
+budget_absolute: [1024]          # rows per estimator
+coreset_methods: [perest_random, cluster_experts, cluster_experts_tuned]
+coreset_kwargs:
+  cluster_experts_tuned: {val_fraction: 0.2, val_max: 2000}
+perest_mode: single_fit
+baseline: perest_random
+combined_aggregators: []
+split_seeds: 3
+selection_seeds: 2
+cache_dir: null
+log_dir: results/logs
+out_csv: results/tables/perest_gate_large.csv

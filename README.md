@@ -117,7 +117,7 @@ TabPFN 9.0.0 needs a one-time licence acceptance before it downloads weights. Lo
 | `experiments.py` | `run_aggregation`, `run_coreset`, `tune_coreset` (dev only), caching/resume/sharding |
 | `metrics.py`, `stats.py`, `effect.py`, `sizes.py`, `validate.py` | scoring, dataset-level paired statistics and Holm, effect sizes and power, size tiers and budgets, schema validation |
 | `estimator.py` | `TabPFNLabClassifier` / `TabPFNLabRegressor`, scikit-learn estimators for external benchmarks |
-| `cli.py` | `aggregation`, `coreset`, `analyze`, `merge`, `validate`, `plan` |
+| `cli.py` | `aggregation`, `coreset`, `scaling`, `analyze`, `merge`, `validate`, `plan`, `datasets` (load every dataset of a config and print what was loaded) |
 
 ## Adding a method
 

@@ -329,6 +329,44 @@ def plan_from_config(cfg: dict, pilot: str | None = None, n_sim=300) -> dict:
     return effect.plan(D, S, sd_dataset, sd_seed, target, alpha=alpha, n_sim=n_sim)
 
 
+# --------------------------------------------------------------------------- dataset check
+
+
+def describe_datasets(cfg: dict) -> pd.DataFrame:
+    """Load every dataset of a config and describe it: run before a long job to catch a wrong OpenML id or task."""
+    from .datasets import OPENML_NAMES, load_dataset
+
+    test_size = float(cfg.get("test_size", 0.3))
+    budgets = [int(b) for b in cfg.get("budget_absolute", []) or []]
+    rows = []
+    for spec in dataset_specs(cfg):
+        row = {"dataset": spec["name"], "split": spec["split"], "task": spec.get("task", "classification")}
+        try:
+            X, y, task = load_dataset(spec)
+        except Exception as e:  # report every dataset, not only the first broken one
+            rows.append({**row, "problem": f"{type(e).__name__}: {str(e)[:120]}"})
+            continue
+        n_train = int(round(len(X) * (1 - test_size)))
+        problems = []
+        if task == "classification":
+            counts = np.unique(y, return_counts=True)[1]
+            target = f"{len(counts)} classes, smallest {counts.min() / len(y):.1%}"
+            if len(counts) > 50 or counts.min() < 2:
+                problems.append("looks like a regression target or has a 1-row class")
+        else:
+            target = f"range {np.min(y):.4g} to {np.max(y):.4g}, {len(np.unique(y))} distinct"
+            if len(np.unique(y)) < 10:
+                problems.append("fewer than 10 distinct targets: classification?")
+        dropped = [b for b in budgets if 2 * b >= n_train]
+        if dropped:
+            problems.append(f"budgets {dropped} dropped (need n_train > 2 * budget)")
+        rows.append({
+            **row, "openml_name": OPENML_NAMES.get(spec["name"], ""), "rows": len(X), "features": X.shape[1], "n_train": n_train,
+            "missing": f"{np.isnan(X).mean():.1%}", "target": target, "problem": "; ".join(problems),
+        })  # fmt: skip
+    return pd.DataFrame(rows).fillna("")
+
+
 # --------------------------------------------------------------------------- main
 
 
@@ -339,6 +377,8 @@ def main(argv=None) -> int:
         p = sub.add_parser(name)
         p.add_argument("--config", required=True)
         p.add_argument("--shard", type=parse_shard, default=None, help="i/N: run every N-th cell starting at i")
+    p = sub.add_parser("datasets", help="load every dataset of a config and print what was loaded")
+    p.add_argument("--config", required=True)
     p = sub.add_parser("analyze")
     p.add_argument("--config")
     p.add_argument("--csv")
@@ -372,6 +412,10 @@ def main(argv=None) -> int:
         problems = validate_csv(csv) if args.shard is None else []
         _report(problems)
         return 0
+    if args.cmd == "datasets":
+        table = describe_datasets(load_config(args.config))
+        print(table.to_string(index=False))
+        return 1 if (table["problem"] != "").any() else 0
     if args.cmd == "analyze":
         csv = _csv_from_args(args)
         analyze(csv)
