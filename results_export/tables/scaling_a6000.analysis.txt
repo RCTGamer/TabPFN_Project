@@ -1,0 +1,278 @@
+== scaling: mean over seeds (primary metrics; full tables in the .analysis.*.csv files) ==
+    dataset  method   metric  budget  n_estimators         mean         se  n_seeds  total_seconds  peak_gpu_mb
+electricity    mean log_loss   512.0             1     0.430563   0.005592        5       1.683366  1124.376465
+electricity    mean log_loss   512.0             2     0.425531   0.004754        5       1.958827  1132.881836
+electricity    mean log_loss   512.0             4     0.426272   0.003666        5       2.410542  1133.089844
+electricity    mean log_loss   512.0             8     0.426709   0.004188        5       3.283938  1133.505859
+electricity    mean log_loss  1024.0             1     0.388590   0.005574        5       1.725989  1136.450684
+electricity    mean log_loss  1024.0             2     0.383987   0.003179        5       1.961369  1144.956055
+electricity    mean log_loss  1024.0             4     0.384335   0.002188        5       2.446157  1145.164062
+electricity    mean log_loss  1024.0             8     0.385501   0.003839        5       3.451802  1145.580078
+electricity    mean log_loss  2048.0             1     0.322164   0.011220        5       1.779643  1160.599121
+electricity    mean log_loss  2048.0             2     0.316795   0.007585        5       2.076004  1169.705566
+electricity    mean log_loss  2048.0             4     0.321914   0.006650        5       2.600716  1169.705566
+electricity    mean log_loss  2048.0             8     0.325063   0.004085        5       3.735900  1169.728516
+electricity    mean log_loss  4096.0             1     0.245220   0.011105        5       1.822951  1208.895996
+electricity    mean log_loss  4096.0             2     0.239937   0.006564        5       2.152793  1218.002441
+electricity    mean log_loss  4096.0             4     0.241515   0.005194        5       2.841900  1218.210449
+electricity    mean log_loss  4096.0             8     0.245003   0.005464        5       4.359292  1218.626465
+electricity    mean log_loss  8192.0             1     0.182467   0.003525        5       1.896943  1305.489746
+electricity    mean log_loss  8192.0             2     0.177376   0.002785        5       2.456550  1313.995117
+electricity    mean log_loss  8192.0             4     0.176654   0.002339        5       3.533651  1314.203125
+electricity    mean log_loss  8192.0             8     0.176408   0.001431        5       5.664240  1314.619141
+electricity    mean log_loss 16384.0             1     0.124748   0.004675        5       2.348830  1498.804199
+electricity    mean log_loss 16384.0             2     0.118485   0.000902        5       3.378356  1507.309570
+electricity    mean log_loss 16384.0             4     0.119603   0.002272        5       5.258339  1507.517578
+electricity    mean log_loss 16384.0             8     0.119262   0.001718        5       9.087338  1507.933594
+electricity    mean log_loss 31718.0             1     0.080544   0.003076        5       3.475509  1863.312012
+electricity    mean log_loss 31718.0             2     0.075197   0.001275        5       5.689766  1871.817383
+electricity    mean log_loss 31718.0             4     0.077099   0.001956        5       9.863412  1872.025391
+electricity    mean log_loss 31718.0             8     0.076254   0.001737        5      18.394350  1872.441406
+      higgs    mean log_loss   512.0             1     0.592856   0.004576        5       2.072517  1440.636719
+      higgs    mean log_loss   512.0             2     0.590458   0.004920        5       2.757625  1459.039551
+      higgs    mean log_loss   512.0             4     0.589394   0.004377        5       4.094246  1459.488770
+      higgs    mean log_loss   512.0             8     0.588875   0.004506        5       6.829537  1460.387207
+      higgs    mean log_loss  1024.0             1     0.572179   0.003406        5       2.197616  1452.867188
+      higgs    mean log_loss  1024.0             2     0.570948   0.003355        5       2.857495  1471.270020
+      higgs    mean log_loss  1024.0             4     0.570503   0.002917        5       4.222333  1471.719238
+      higgs    mean log_loss  1024.0             8     0.570209   0.002797        5       7.142076  1472.617676
+      higgs    mean log_loss  2048.0             1     0.557034   0.002085        5       2.275011  1477.328125
+      higgs    mean log_loss  2048.0             2     0.555789   0.002335        5       2.997980  1495.730957
+      higgs    mean log_loss  2048.0             4     0.555373   0.002151        5       4.570332  1496.180176
+      higgs    mean log_loss  2048.0             8     0.555186   0.002295        5       7.485754  1497.078613
+      higgs    mean log_loss  4096.0             1     0.542909   0.001425        5       2.393821  1526.279297
+      higgs    mean log_loss  4096.0             2     0.541660   0.001447        5       3.178931  1544.682129
+      higgs    mean log_loss  4096.0             4     0.541297   0.001515        5       4.970266  1545.131348
+      higgs    mean log_loss  4096.0             8     0.541129   0.001478        5       8.375367  1546.029785
+      higgs    mean log_loss  8192.0             1     0.531469   0.000977        5       2.643485  1624.093750
+      higgs    mean log_loss  8192.0             2     0.530302   0.000980        5       3.725879  1642.496582
+      higgs    mean log_loss  8192.0             4     0.529915   0.000873        5       5.995215  1642.945801
+      higgs    mean log_loss  8192.0             8     0.529721   0.000862        5      10.524527  1643.844238
+      higgs    mean log_loss 16384.0             1     0.521143   0.000953        5       3.223900  1816.928711
+      higgs    mean log_loss 16384.0             2     0.520102   0.001183        5       4.973139  1835.331543
+      higgs    mean log_loss 16384.0             4     0.519524   0.001035        5       8.575438  1835.780762
+      higgs    mean log_loss 16384.0             8     0.519145   0.000996        5      15.618034  1836.679199
+      higgs    mean log_loss 32768.0             1     0.512003   0.001285        5       4.998947  2203.000000
+      higgs    mean log_loss 32768.0             2     0.510945   0.001336        5       8.463916  2221.402832
+      higgs    mean log_loss 32768.0             4     0.510376   0.001117        5      15.334325  2221.852051
+      higgs    mean log_loss 32768.0             8     0.510112   0.001109        5      29.287447  2222.750488
+      higgs    mean log_loss 65536.0             1     0.502954   0.001012        5      10.370388  2974.875000
+      higgs    mean log_loss 65536.0             2     0.502024   0.001062        5      19.089382  2993.277832
+      higgs    mean log_loss 65536.0             4     0.501457   0.000814        5      36.704882  2993.727051
+      higgs    mean log_loss 65536.0             8     0.501181   0.000722        5      71.995082  2994.625488
+      higgs    mean log_loss 68635.0             1     0.502169   0.001105        5      10.294709  3052.835938
+      higgs    mean log_loss 68635.0             2     0.501317   0.001152        5      19.023602  3071.238770
+      higgs    mean log_loss 68635.0             4     0.500769   0.000852        5      36.559863  3071.687988
+      higgs    mean log_loss 68635.0             8     0.500478   0.000766        5      71.591818  3072.586426
+     houses mixture     rmse   512.0             1 51133.473255 519.117827        5       1.697342  1903.835938
+     houses mixture     rmse   512.0             2 50905.425692 570.780972        5       1.941512  2020.990723
+     houses mixture     rmse   512.0             4 50908.248723 549.647618        5       2.635796  2021.938965
+     houses mixture     rmse   512.0             8 50852.134936 506.489163        5       3.923775  2021.938965
+     houses mixture     rmse  1024.0             1 47195.713386 133.777147        5       1.661298  1902.887695
+     houses mixture     rmse  1024.0             2 47022.401036 125.133823        5       2.039259  2020.990723
+     houses mixture     rmse  1024.0             4 47013.366458 109.907475        5       2.478226  2020.990723
+     houses mixture     rmse  1024.0             8 46933.999699 118.031872        5       3.776343  2020.990723
+     houses mixture     rmse  2048.0             1 44525.352344 360.896023        5       1.655383  1902.887695
+     houses mixture     rmse  2048.0             2 44254.224072 370.802507        5       1.918973  2020.990723
+     houses mixture     rmse  2048.0             4 44284.150389 370.377698        5       2.807163  2021.938965
+     houses mixture     rmse  2048.0             8 44216.712575 367.072258        5       4.016663  2021.938965
+     houses mixture     rmse  4096.0             1 41402.773682 215.748980        5       1.739979  1902.887695
+     houses mixture     rmse  4096.0             2 41135.952816 247.396724        5       2.043612  2020.990723
+     houses mixture     rmse  4096.0             4 41132.597673 283.331920        5       2.896701  2020.990723
+     houses mixture     rmse  4096.0             8 41075.737175 267.595401        5       4.465614  2020.990723
+     houses mixture     rmse  8192.0             1 39130.106573 268.564278        5       1.859443  1902.887695
+     houses mixture     rmse  8192.0             2 38879.575176 258.628577        5       2.399067  2020.990723
+     houses mixture     rmse  8192.0             4 38839.140139 257.248682        5       3.345619  2020.990723
+     houses mixture     rmse  8192.0             8 38804.928193 246.995902        5       5.703553  2020.990723
+     houses mixture     rmse 14448.0             1 37558.769246 148.131979        5       2.137681  1903.646289
+     houses mixture     rmse 14448.0             2 37284.618968 205.075464        5       2.888373  2021.180371
+     houses mixture     rmse 14448.0             4 37245.593793 200.275312        5       4.483098  2020.990723
+     houses mixture     rmse 14448.0             8 37186.859211 188.395675        5       7.976882  2021.938965
+    phoneme    mean log_loss   512.0             1     0.330032   0.010756        5       1.616972   956.724316
+    phoneme    mean log_loss   512.0             2     0.329785   0.009683        5       1.599626   957.489941
+    phoneme    mean log_loss   512.0             4     0.329688   0.009376        5       1.806952   957.515332
+    phoneme    mean log_loss   512.0             8     0.328876   0.009797        5       2.152935   957.566113
+    phoneme    mean log_loss  1024.0             1     0.280840   0.009634        5       1.590059   956.808301
+    phoneme    mean log_loss  1024.0             2     0.280692   0.009490        5       1.593743   957.823926
+    phoneme    mean log_loss  1024.0             4     0.280133   0.009553        5       1.705980   957.849316
+    phoneme    mean log_loss  1024.0             8     0.278768   0.009431        5       1.894222   957.900098
+    phoneme    mean log_loss  2048.0             1     0.234116   0.005940        5       1.549039   957.476270
+    phoneme    mean log_loss  2048.0             2     0.232440   0.005513        5       1.581735   958.491895
+    phoneme    mean log_loss  2048.0             4     0.231567   0.005686        5       1.782723   958.517285
+    phoneme    mean log_loss  2048.0             8     0.231031   0.006054        5       2.109791   958.568066
+    phoneme    mean log_loss  3782.0             1     0.180813   0.002037        5       1.581877   970.951660
+    phoneme    mean log_loss  3782.0             2     0.179963   0.002236        5       1.704092   971.967285
+    phoneme    mean log_loss  3782.0             4     0.178607   0.001717        5       2.002313   971.992676
+    phoneme    mean log_loss  3782.0             8     0.178344   0.001758        5       2.527500   972.043457
+
+== doubling the context at fixed E: improvement > 0 is better, Holm-adjusted p ==
+    dataset           task  method   metric  n_estimators  budget_from  budget_to  n_seeds   value_from     value_to  improvement         se            p   p_holm  significant_holm
+electricity classification    mean log_loss             1        512.0     1024.0        5     0.430563     0.388590     0.041973   0.001360 6.562221e-06 0.001949              True
+electricity classification    mean log_loss             1       1024.0     2048.0        5     0.388590     0.322164     0.066426   0.006727 5.902434e-04 0.090752             False
+electricity classification    mean log_loss             1       2048.0     4096.0        5     0.322164     0.245220     0.076944   0.005370 1.378812e-04 0.029948              True
+electricity classification    mean log_loss             1       4096.0     8192.0        5     0.245220     0.182467     0.062753   0.008831 2.072199e-03 0.238303             False
+electricity classification    mean log_loss             1       8192.0    16384.0        5     0.182467     0.124748     0.057719   0.002085 1.013562e-05 0.002919              True
+electricity classification    mean log_loss             1      16384.0    31718.0        5     0.124748     0.080544     0.044204   0.002284 4.203132e-05 0.010774              True
+electricity classification    mean log_loss             2        512.0     1024.0        5     0.425531     0.383987     0.041545   0.002652 9.702173e-05 0.022218              True
+electricity classification    mean log_loss             2       1024.0     2048.0        5     0.383987     0.316795     0.067191   0.006802 5.893019e-04 0.090752             False
+electricity classification    mean log_loss             2       2048.0     4096.0        5     0.316795     0.239937     0.076858   0.003215 1.815745e-05 0.005011              True
+electricity classification    mean log_loss             2       4096.0     8192.0        5     0.239937     0.177376     0.062560   0.004357 1.367290e-04 0.029944              True
+electricity classification    mean log_loss             2       8192.0    16384.0        5     0.177376     0.118485     0.058891   0.002735 2.753220e-05 0.007379              True
+electricity classification    mean log_loss             2      16384.0    31718.0        5     0.118485     0.075197     0.043288   0.000867 9.615253e-07 0.000296              True
+electricity classification    mean log_loss             4        512.0     1024.0        5     0.426272     0.384335     0.041938   0.003463 2.668721e-04 0.050175             False
+electricity classification    mean log_loss             4       1024.0     2048.0        5     0.384335     0.321914     0.062421   0.006154 5.318243e-04 0.084028             False
+electricity classification    mean log_loss             4       2048.0     4096.0        5     0.321914     0.241515     0.080399   0.003106 1.323069e-05 0.003744              True
+electricity classification    mean log_loss             4       4096.0     8192.0        5     0.241515     0.176654     0.064861   0.003682 6.096979e-05 0.015121              True
+electricity classification    mean log_loss             4       8192.0    16384.0        5     0.176654     0.119603     0.057051   0.002392 1.833569e-05 0.005042              True
+electricity classification    mean log_loss             4      16384.0    31718.0        5     0.119603     0.077099     0.042504   0.001227 4.142133e-06 0.001243              True
+electricity classification    mean log_loss             8        512.0     1024.0        5     0.426709     0.385501     0.041208   0.002739 1.137769e-04 0.025714              True
+electricity classification    mean log_loss             8       1024.0     2048.0        5     0.385501     0.325063     0.060438   0.005027 2.744325e-04 0.050496             False
+electricity classification    mean log_loss             8       2048.0     4096.0        5     0.325063     0.245003     0.080060   0.001869 1.777381e-06 0.000544              True
+electricity classification    mean log_loss             8       4096.0     8192.0        5     0.245003     0.176408     0.068595   0.004968 1.595137e-04 0.033338              True
+electricity classification    mean log_loss             8       8192.0    16384.0        5     0.176408     0.119262     0.057146   0.002025 9.378403e-06 0.002729              True
+electricity classification    mean log_loss             8      16384.0    31718.0        5     0.119262     0.076254     0.043008   0.002048 3.038310e-05 0.008052              True
+      higgs classification    mean log_loss             1        512.0     1024.0        5     0.592856     0.572179     0.020676   0.002586 1.326224e-03 0.176388             False
+      higgs classification    mean log_loss             1       1024.0     2048.0        5     0.572179     0.557034     0.015145   0.002877 6.232812e-03 0.592117             False
+      higgs classification    mean log_loss             1       2048.0     4096.0        5     0.557034     0.542909     0.014125   0.000980 1.344683e-04 0.029583              True
+      higgs classification    mean log_loss             1       4096.0     8192.0        5     0.542909     0.531469     0.011439   0.000685 7.545653e-05 0.018209              True
+      higgs classification    mean log_loss             1       8192.0    16384.0        5     0.531469     0.521143     0.010327   0.000309 4.779300e-06 0.001429              True
+      higgs classification    mean log_loss             1      16384.0    32768.0        5     0.521143     0.512003     0.009139   0.000573 9.052090e-05 0.021036              True
+      higgs classification    mean log_loss             1      32768.0    65536.0        5     0.512003     0.502954     0.009049   0.000357 1.433339e-05 0.004028              True
+      higgs classification    mean log_loss             1      65536.0    68635.0        5     0.502954     0.502169     0.000785   0.000135 4.348392e-03 0.439188             False
+      higgs classification    mean log_loss             2        512.0     1024.0        5     0.590458     0.570948     0.019510   0.002464 1.376002e-03 0.179284             False
+      higgs classification    mean log_loss             2       1024.0     2048.0        5     0.570948     0.555789     0.015159   0.003237 9.429203e-03 0.848628             False
+      higgs classification    mean log_loss             2       2048.0     4096.0        5     0.555789     0.541660     0.014129   0.001223 3.205669e-04 0.057509             False
+      higgs classification    mean log_loss             2       4096.0     8192.0        5     0.541660     0.530302     0.011358   0.000706 8.713888e-05 0.020565              True
+      higgs classification    mean log_loss             2       8192.0    16384.0        5     0.530302     0.520102     0.010200   0.000282 3.508768e-06 0.001060              True
+      higgs classification    mean log_loss             2      16384.0    32768.0        5     0.520102     0.510945     0.009157   0.000353 1.313534e-05 0.003730              True
+      higgs classification    mean log_loss             2      32768.0    65536.0        5     0.510945     0.502024     0.008921   0.000310 8.716739e-06 0.002571              True
+      higgs classification    mean log_loss             2      65536.0    68635.0        5     0.502024     0.501317     0.000707   0.000142 7.677853e-03 0.714040             False
+      higgs classification    mean log_loss             4        512.0     1024.0        5     0.589394     0.570503     0.018891   0.002254 1.108572e-03 0.152983             False
+      higgs classification    mean log_loss             4       1024.0     2048.0        5     0.570503     0.555373     0.015130   0.003196 9.073635e-03 0.825701             False
+      higgs classification    mean log_loss             4       2048.0     4096.0        5     0.555373     0.541297     0.014076   0.000987 1.404505e-04 0.030197              True
+      higgs classification    mean log_loss             4       4096.0     8192.0        5     0.541297     0.529915     0.011382   0.000843 1.739753e-04 0.036013              True
+      higgs classification    mean log_loss             4       8192.0    16384.0        5     0.529915     0.519524     0.010390   0.000255 2.153663e-06 0.000657              True
+      higgs classification    mean log_loss             4      16384.0    32768.0        5     0.519524     0.510376     0.009148   0.000363 1.475068e-05 0.004130              True
+      higgs classification    mean log_loss             4      32768.0    65536.0        5     0.510376     0.501457     0.008919   0.000421 2.945998e-05 0.007836              True
+      higgs classification    mean log_loss             4      65536.0    68635.0        5     0.501457     0.500769     0.000688   0.000095 1.933285e-03 0.226194             False
+      higgs classification    mean log_loss             8        512.0     1024.0        5     0.588875     0.570209     0.018667   0.002359 1.379860e-03 0.179284             False
+      higgs classification    mean log_loss             8       1024.0     2048.0        5     0.570209     0.555186     0.015022   0.003070 8.080342e-03 0.743391             False
+      higgs classification    mean log_loss             8       2048.0     4096.0        5     0.555186     0.541129     0.014057   0.001150 2.574597e-04 0.049690              True
+      higgs classification    mean log_loss             8       4096.0     8192.0        5     0.541129     0.529721     0.011409   0.000778 1.255959e-04 0.028133              True
+      higgs classification    mean log_loss             8       8192.0    16384.0        5     0.529721     0.519145     0.010576   0.000272 2.632024e-06 0.000798              True
+      higgs classification    mean log_loss             8      16384.0    32768.0        5     0.519145     0.510112     0.009033   0.000370 1.661967e-05 0.004604              True
+      higgs classification    mean log_loss             8      32768.0    65536.0        5     0.510112     0.501181     0.008931   0.000461 4.187909e-05 0.010774              True
+      higgs classification    mean log_loss             8      65536.0    68635.0        5     0.501181     0.500478     0.000703   0.000104 2.469249e-03 0.274087             False
+     houses     regression mixture     rmse             1        512.0     1024.0        5 51133.473255 47195.713386  3937.759868 453.677182 9.697406e-04 0.138673             False
+     houses     regression mixture     rmse             1       1024.0     2048.0        5 47195.713386 44525.352344  2670.361043 321.961743 1.153799e-03 0.158070             False
+     houses     regression mixture     rmse             1       2048.0     4096.0        5 44525.352344 41402.773682  3122.578661 213.252552 1.265582e-04 0.028222              True
+     houses     regression mixture     rmse             1       4096.0     8192.0        5 41402.773682 39130.106573  2272.667109 143.398173 9.262808e-05 0.021397              True
+     houses     regression mixture     rmse             1       8192.0    14448.0        5 39130.106573 37558.769246  1571.337327 136.110991 3.215353e-04 0.057509             False
+     houses     regression mixture     rmse             2        512.0     1024.0        5 50905.425692 47022.401036  3883.024656 447.639531 9.719725e-04 0.138673             False
+     houses     regression mixture     rmse             2       1024.0     2048.0        5 47022.401036 44254.224072  2768.176964 300.173234 7.683578e-04 0.113717             False
+     houses     regression mixture     rmse             2       2048.0     4096.0        5 44254.224072 41135.952816  3118.271256 243.390853 2.139323e-04 0.042786              True
+     houses     regression mixture     rmse             2       4096.0     8192.0        5 41135.952816 38879.575176  2256.377640 159.123659 1.436083e-04 0.030589              True
+     houses     regression mixture     rmse             2       8192.0    14448.0        5 38879.575176 37284.618968  1594.956209  99.967485 9.021984e-05 0.021036              True
+     houses     regression mixture     rmse             4        512.0     1024.0        5 50908.248723 47013.366458  3894.882265 457.635190 1.045446e-03 0.147408             False
+     houses     regression mixture     rmse             4       1024.0     2048.0        5 47013.366458 44284.150389  2729.216069 285.248023 6.666635e-04 0.100666             False
+     houses     regression mixture     rmse             4       2048.0     4096.0        5 44284.150389 41132.597673  3151.552715 237.662651 1.868996e-04 0.038128              True
+     houses     regression mixture     rmse             4       4096.0     8192.0        5 41132.597673 38839.140139  2293.457534 170.460824 1.765467e-04 0.036369              True
+     houses     regression mixture     rmse             4       8192.0    14448.0        5 38839.140139 37245.593793  1593.546347  98.332449 8.482719e-05 0.020189              True
+     houses     regression mixture     rmse             8        512.0     1024.0        5 50852.134936 46933.999699  3918.135237 434.341969 8.363603e-04 0.122109             False
+     houses     regression mixture     rmse             8       1024.0     2048.0        5 46933.999699 44216.712575  2717.287124 270.512348 5.523247e-04 0.086715             False
+     houses     regression mixture     rmse             8       2048.0     4096.0        5 44216.712575 41075.737175  3140.975401 259.502186 2.672690e-04 0.050175             False
+     houses     regression mixture     rmse             8       4096.0     8192.0        5 41075.737175 38804.928193  2270.808981 181.229771 2.334141e-04 0.045749              True
+     houses     regression mixture     rmse             8       8192.0    14448.0        5 38804.928193 37186.859211  1618.068982 100.406205 8.672378e-05 0.020554              True
+    phoneme classification    mean log_loss             1        512.0     1024.0        5     0.330032     0.280840     0.049192   0.005976 1.187573e-03 0.161510             False
+    phoneme classification    mean log_loss             1       1024.0     2048.0        5     0.280840     0.234116     0.046724   0.005531 1.075537e-03 0.149500             False
+    phoneme classification    mean log_loss             1       2048.0     3782.0        5     0.234116     0.180813     0.053303   0.004679 3.385743e-04 0.059250             False
+    phoneme classification    mean log_loss             2        512.0     1024.0        5     0.329785     0.280692     0.049093   0.005330 7.721817e-04 0.113717             False
+    phoneme classification    mean log_loss             2       1024.0     2048.0        5     0.280692     0.232440     0.048252   0.005875 1.198046e-03 0.161736             False
+    phoneme classification    mean log_loss             2       2048.0     3782.0        5     0.232440     0.179963     0.052477   0.004121 2.191759e-04 0.043330              True
+    phoneme classification    mean log_loss             4        512.0     1024.0        5     0.329688     0.280133     0.049554   0.005581 8.888086e-04 0.128877             False
+    phoneme classification    mean log_loss             4       1024.0     2048.0        5     0.280133     0.231567     0.048567   0.005512 9.151468e-04 0.131781             False
+    phoneme classification    mean log_loss             4       2048.0     3782.0        5     0.231567     0.178607     0.052960   0.004371 2.662959e-04 0.050175             False
+    phoneme classification    mean log_loss             8        512.0     1024.0        5     0.328876     0.278768     0.050108   0.005889 1.046315e-03 0.147408             False
+    phoneme classification    mean log_loss             8       1024.0     2048.0        5     0.278768     0.231031     0.047737   0.005107 7.295284e-04 0.108700             False
+    phoneme classification    mean log_loss             8       2048.0     3782.0        5     0.231031     0.178344     0.052687   0.004718 3.659102e-04 0.062550             False
+
+== next estimator count at fixed context: improvement > 0 is better, Holm-adjusted p ==
+    dataset           task  method   metric  budget  n_estimators_from  n_estimators_to  n_seeds   value_from     value_to  improvement         se        p   p_holm  significant_holm
+electricity classification    mean log_loss   512.0                  1                2        5     0.430563     0.425531     0.005031   0.003573 0.231906 1.000000             False
+electricity classification    mean log_loss   512.0                  2                4        5     0.425531     0.426272    -0.000741   0.001596 0.666574 1.000000             False
+electricity classification    mean log_loss   512.0                  4                8        5     0.426272     0.426709    -0.000437   0.001522 0.788516 1.000000             False
+electricity classification    mean log_loss  1024.0                  1                2        5     0.388590     0.383987     0.004603   0.005654 0.461264 1.000000             False
+electricity classification    mean log_loss  1024.0                  2                4        5     0.383987     0.384335    -0.000348   0.002812 0.907429 1.000000             False
+electricity classification    mean log_loss  1024.0                  4                8        5     0.384335     0.385501    -0.001166   0.002871 0.705402 1.000000             False
+electricity classification    mean log_loss  2048.0                  1                2        5     0.322164     0.316795     0.005369   0.007941 0.536037 1.000000             False
+electricity classification    mean log_loss  2048.0                  2                4        5     0.316795     0.321914    -0.005119   0.004231 0.292938 1.000000             False
+electricity classification    mean log_loss  2048.0                  4                8        5     0.321914     0.325063    -0.003149   0.004918 0.556773 1.000000             False
+electricity classification    mean log_loss  4096.0                  1                2        5     0.245220     0.239937     0.005284   0.008431 0.564874 1.000000             False
+electricity classification    mean log_loss  4096.0                  2                4        5     0.239937     0.241515    -0.001578   0.002151 0.503934 1.000000             False
+electricity classification    mean log_loss  4096.0                  4                8        5     0.241515     0.245003    -0.003489   0.002224 0.191775 1.000000             False
+electricity classification    mean log_loss  8192.0                  1                2        5     0.182467     0.177376     0.005090   0.003176 0.184188 1.000000             False
+electricity classification    mean log_loss  8192.0                  2                4        5     0.177376     0.176654     0.000722   0.001296 0.607020 1.000000             False
+electricity classification    mean log_loss  8192.0                  4                8        5     0.176654     0.176408     0.000246   0.001162 0.842891 1.000000             False
+electricity classification    mean log_loss 16384.0                  1                2        5     0.124748     0.118485     0.006263   0.004030 0.195145 1.000000             False
+electricity classification    mean log_loss 16384.0                  2                4        5     0.118485     0.119603    -0.001118   0.002530 0.681502 1.000000             False
+electricity classification    mean log_loss 16384.0                  4                8        5     0.119603     0.119262     0.000341   0.001101 0.772441 1.000000             False
+electricity classification    mean log_loss 31718.0                  1                2        5     0.080544     0.075197     0.005347   0.002541 0.103129 1.000000             False
+electricity classification    mean log_loss 31718.0                  2                4        5     0.075197     0.077099    -0.001902   0.001692 0.323817 1.000000             False
+electricity classification    mean log_loss 31718.0                  4                8        5     0.077099     0.076254     0.000845   0.000876 0.389236 1.000000             False
+      higgs classification    mean log_loss   512.0                  1                2        5     0.592856     0.590458     0.002398   0.001595 0.207236 1.000000             False
+      higgs classification    mean log_loss   512.0                  2                4        5     0.590458     0.589394     0.001064   0.000674 0.189435 1.000000             False
+      higgs classification    mean log_loss   512.0                  4                8        5     0.589394     0.588875     0.000518   0.000344 0.206780 1.000000             False
+      higgs classification    mean log_loss  1024.0                  1                2        5     0.572179     0.570948     0.001231   0.000307 0.016024 1.000000             False
+      higgs classification    mean log_loss  1024.0                  2                4        5     0.570948     0.570503     0.000445   0.000555 0.467396 1.000000             False
+      higgs classification    mean log_loss  1024.0                  4                8        5     0.570503     0.570209     0.000294   0.000226 0.263463 1.000000             False
+      higgs classification    mean log_loss  2048.0                  1                2        5     0.557034     0.555789     0.001245   0.000441 0.047642 1.000000             False
+      higgs classification    mean log_loss  2048.0                  2                4        5     0.555789     0.555373     0.000416   0.000324 0.267644 1.000000             False
+      higgs classification    mean log_loss  2048.0                  4                8        5     0.555373     0.555186     0.000187   0.000157 0.299239 1.000000             False
+      higgs classification    mean log_loss  4096.0                  1                2        5     0.542909     0.541660     0.001249   0.000260 0.008645 1.000000             False
+      higgs classification    mean log_loss  4096.0                  2                4        5     0.541660     0.541297     0.000363   0.000266 0.244291 1.000000             False
+      higgs classification    mean log_loss  4096.0                  4                8        5     0.541297     0.541129     0.000167   0.000092 0.144071 1.000000             False
+      higgs classification    mean log_loss  8192.0                  1                2        5     0.531469     0.530302     0.001167   0.000166 0.002182 0.602345             False
+      higgs classification    mean log_loss  8192.0                  2                4        5     0.530302     0.529915     0.000388   0.000148 0.059176 1.000000             False
+      higgs classification    mean log_loss  8192.0                  4                8        5     0.529915     0.529721     0.000194   0.000068 0.045448 1.000000             False
+      higgs classification    mean log_loss 16384.0                  1                2        5     0.521143     0.520102     0.001040   0.000247 0.013652 1.000000             False
+      higgs classification    mean log_loss 16384.0                  2                4        5     0.520102     0.519524     0.000578   0.000206 0.048638 1.000000             False
+      higgs classification    mean log_loss 16384.0                  4                8        5     0.519524     0.519145     0.000379   0.000126 0.039609 1.000000             False
+      higgs classification    mean log_loss 32768.0                  1                2        5     0.512003     0.510945     0.001058   0.000329 0.032494 1.000000             False
+      higgs classification    mean log_loss 32768.0                  2                4        5     0.510945     0.510376     0.000569   0.000225 0.064605 1.000000             False
+      higgs classification    mean log_loss 32768.0                  4                8        5     0.510376     0.510112     0.000264   0.000072 0.021257 1.000000             False
+      higgs classification    mean log_loss 65536.0                  1                2        5     0.502954     0.502024     0.000930   0.000230 0.015677 1.000000             False
+      higgs classification    mean log_loss 65536.0                  2                4        5     0.502024     0.501457     0.000567   0.000335 0.165380 1.000000             False
+      higgs classification    mean log_loss 65536.0                  4                8        5     0.501457     0.501181     0.000276   0.000116 0.076193 1.000000             False
+      higgs classification    mean log_loss 68635.0                  1                2        5     0.502169     0.501317     0.000852   0.000279 0.037925 1.000000             False
+      higgs classification    mean log_loss 68635.0                  2                4        5     0.501317     0.500769     0.000548   0.000387 0.229994 1.000000             False
+      higgs classification    mean log_loss 68635.0                  4                8        5     0.500769     0.500478     0.000291   0.000107 0.052966 1.000000             False
+     houses     regression mixture     rmse   512.0                  1                2        5 51133.473255 50905.425692   228.047562 154.988953 0.215156 1.000000             False
+     houses     regression mixture     rmse   512.0                  2                4        5 50905.425692 50908.248723    -2.823031  46.566307 0.954567 1.000000             False
+     houses     regression mixture     rmse   512.0                  4                8        5 50908.248723 50852.134936    56.113787  80.355420 0.523445 1.000000             False
+     houses     regression mixture     rmse  1024.0                  1                2        5 47195.713386 47022.401036   173.312350 131.281369 0.257258 1.000000             False
+     houses     regression mixture     rmse  1024.0                  2                4        5 47022.401036 47013.366458     9.034579  62.159047 0.891468 1.000000             False
+     houses     regression mixture     rmse  1024.0                  4                8        5 47013.366458 46933.999699    79.366759  36.011464 0.092248 1.000000             False
+     houses     regression mixture     rmse  2048.0                  1                2        5 44525.352344 44254.224072   271.128272  83.275956 0.031205 1.000000             False
+     houses     regression mixture     rmse  2048.0                  2                4        5 44254.224072 44284.150389   -29.926317  32.093493 0.403879 1.000000             False
+     houses     regression mixture     rmse  2048.0                  4                8        5 44284.150389 44216.712575    67.437813  19.262396 0.024873 1.000000             False
+     houses     regression mixture     rmse  4096.0                  1                2        5 41402.773682 41135.952816   266.820866  58.776098 0.010500 1.000000             False
+     houses     regression mixture     rmse  4096.0                  2                4        5 41135.952816 41132.597673     3.355143  38.439726 0.934641 1.000000             False
+     houses     regression mixture     rmse  4096.0                  4                8        5 41132.597673 41075.737175    56.860499  34.555847 0.175219 1.000000             False
+     houses     regression mixture     rmse  8192.0                  1                2        5 39130.106573 38879.575176   250.531397  47.997042 0.006429 1.000000             False
+     houses     regression mixture     rmse  8192.0                  2                4        5 38879.575176 38839.140139    40.435037   9.876798 0.014927 1.000000             False
+     houses     regression mixture     rmse  8192.0                  4                8        5 38839.140139 38804.928193    34.211946  17.481807 0.121973 1.000000             False
+     houses     regression mixture     rmse 14448.0                  1                2        5 37558.769246 37284.618968   274.150278  75.742937 0.022367 1.000000             False
+     houses     regression mixture     rmse 14448.0                  2                4        5 37284.618968 37245.593793    39.025175  11.681530 0.028815 1.000000             False
+     houses     regression mixture     rmse 14448.0                  4                8        5 37245.593793 37186.859211    58.734582  19.852566 0.041615 1.000000             False
+    phoneme classification    mean log_loss   512.0                  1                2        5     0.330032     0.329785     0.000247   0.001188 0.845355 1.000000             False
+    phoneme classification    mean log_loss   512.0                  2                4        5     0.329785     0.329688     0.000097   0.001268 0.942729 1.000000             False
+    phoneme classification    mean log_loss   512.0                  4                8        5     0.329688     0.328876     0.000812   0.000578 0.232815 1.000000             False
+    phoneme classification    mean log_loss  1024.0                  1                2        5     0.280840     0.280692     0.000148   0.000298 0.645123 1.000000             False
+    phoneme classification    mean log_loss  1024.0                  2                4        5     0.280692     0.280133     0.000559   0.001007 0.608735 1.000000             False
+    phoneme classification    mean log_loss  1024.0                  4                8        5     0.280133     0.278768     0.001365   0.000351 0.017697 1.000000             False
+    phoneme classification    mean log_loss  2048.0                  1                2        5     0.234116     0.232440     0.001676   0.000503 0.029076 1.000000             False
+    phoneme classification    mean log_loss  2048.0                  2                4        5     0.232440     0.231567     0.000873   0.000400 0.094448 1.000000             False
+    phoneme classification    mean log_loss  2048.0                  4                8        5     0.231567     0.231031     0.000536   0.000637 0.448171 1.000000             False
+    phoneme classification    mean log_loss  3782.0                  1                2        5     0.180813     0.179963     0.000850   0.000553 0.199306 1.000000             False
+    phoneme classification    mean log_loss  3782.0                  2                4        5     0.179963     0.178607     0.001356   0.000690 0.120669 1.000000             False
+    phoneme classification    mean log_loss  3782.0                  4                8        5     0.178607     0.178344     0.000263   0.000473 0.608333 1.000000             False

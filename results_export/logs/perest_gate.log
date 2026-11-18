@@ -1,0 +1,136 @@
+2026-11-16 15:14:39,322 INFO run perest_gate: 108 cells (0 already done) -> results/tables/perest_gate.csv
+2026-11-16 15:15:14,153 INFO cell 1/108 coreset|electricity|s0|r0|full|full|31718 rows=4 wall=34.83s peak_gpu_mb=1873
+2026-11-16 15:15:18,189 INFO cell 2/108 coreset|electricity|s0|r0|perest_random|a1024|1024 rows=4 wall=4.04s peak_gpu_mb=1146
+2026-11-16 15:15:22,584 INFO cell 3/108 coreset|electricity|s0|r0|cluster_experts|a1024|1024 rows=8 wall=4.39s peak_gpu_mb=1146
+2026-11-16 15:15:29,622 INFO gate fit electricity seed=0 n_val=2000 nearest_is_best=0.606 tau_mult=0.158 (+bias 0.168) val_loss heuristic=0.24927 tuned=0.21277 +bias=0.21212
+2026-11-16 15:15:29,688 INFO cell 4/108 coreset|electricity|s0|r0|cluster_experts_tuned|a1024|1024 rows=12 wall=7.10s peak_gpu_mb=1146
+2026-11-16 15:15:47,974 INFO cell 5/108 coreset|electricity|s0|r1|full|full|31718 rows=4 wall=18.29s peak_gpu_mb=1873
+2026-11-16 15:15:51,987 INFO cell 6/108 coreset|electricity|s0|r1|perest_random|a1024|1024 rows=4 wall=4.01s peak_gpu_mb=1146
+2026-11-16 15:15:56,995 INFO cell 7/108 coreset|electricity|s0|r1|cluster_experts|a1024|1024 rows=8 wall=5.01s peak_gpu_mb=1146
+2026-11-16 15:16:03,906 INFO gate fit electricity seed=1 n_val=2000 nearest_is_best=0.607 tau_mult=0.158 (+bias 0.179) val_loss heuristic=0.24604 tuned=0.21581 +bias=0.21556
+2026-11-16 15:16:03,978 INFO cell 8/108 coreset|electricity|s0|r1|cluster_experts_tuned|a1024|1024 rows=12 wall=6.98s peak_gpu_mb=1146
+2026-11-16 15:16:22,125 INFO cell 9/108 coreset|electricity|s0|r2|full|full|31718 rows=4 wall=18.15s peak_gpu_mb=1873
+2026-11-16 15:16:26,036 INFO cell 10/108 coreset|electricity|s0|r2|perest_random|a1024|1024 rows=4 wall=3.91s peak_gpu_mb=1146
+2026-11-16 15:16:31,629 INFO cell 11/108 coreset|electricity|s0|r2|cluster_experts|a1024|1024 rows=8 wall=5.59s peak_gpu_mb=1146
+2026-11-16 15:16:39,675 INFO gate fit electricity seed=2 n_val=2000 nearest_is_best=0.591 tau_mult=0.251 (+bias 0.23) val_loss heuristic=0.25637 tuned=0.23389 +bias=0.23220
+2026-11-16 15:16:39,750 INFO cell 12/108 coreset|electricity|s0|r2|cluster_experts_tuned|a1024|1024 rows=12 wall=8.12s peak_gpu_mb=1146
+2026-11-16 15:16:58,126 INFO cell 13/108 coreset|electricity|s1|r0|full|full|31718 rows=4 wall=18.37s peak_gpu_mb=1873
+2026-11-16 15:17:02,533 INFO cell 14/108 coreset|electricity|s1|r0|perest_random|a1024|1024 rows=4 wall=4.41s peak_gpu_mb=1146
+2026-11-16 15:17:06,691 INFO cell 15/108 coreset|electricity|s1|r0|cluster_experts|a1024|1024 rows=8 wall=4.16s peak_gpu_mb=1146
+2026-11-16 15:17:12,787 INFO gate fit electricity seed=0 n_val=2000 nearest_is_best=0.568 tau_mult=0.316 (+bias 0.306) val_loss heuristic=0.26594 tuned=0.24244 +bias=0.23885
+2026-11-16 15:17:12,854 INFO cell 16/108 coreset|electricity|s1|r0|cluster_experts_tuned|a1024|1024 rows=12 wall=6.16s peak_gpu_mb=1146
+2026-11-16 15:17:30,816 INFO cell 17/108 coreset|electricity|s1|r1|full|full|31718 rows=4 wall=17.96s peak_gpu_mb=1873
+2026-11-16 15:17:35,851 INFO cell 18/108 coreset|electricity|s1|r1|perest_random|a1024|1024 rows=4 wall=5.03s peak_gpu_mb=1146
+2026-11-16 15:17:41,109 INFO cell 19/108 coreset|electricity|s1|r1|cluster_experts|a1024|1024 rows=8 wall=5.26s peak_gpu_mb=1146
+2026-11-16 15:17:48,434 INFO gate fit electricity seed=1 n_val=2000 nearest_is_best=0.634 tau_mult=0.0398 (+bias 0.042) val_loss heuristic=0.24841 tuned=0.20758 +bias=0.20751
+2026-11-16 15:17:48,509 INFO cell 20/108 coreset|electricity|s1|r1|cluster_experts_tuned|a1024|1024 rows=12 wall=7.40s peak_gpu_mb=1146
+2026-11-16 15:18:06,841 INFO cell 21/108 coreset|electricity|s1|r2|full|full|31718 rows=4 wall=18.33s peak_gpu_mb=1873
+2026-11-16 15:18:11,442 INFO cell 22/108 coreset|electricity|s1|r2|perest_random|a1024|1024 rows=4 wall=4.60s peak_gpu_mb=1146
+2026-11-16 15:18:16,717 INFO cell 23/108 coreset|electricity|s1|r2|cluster_experts|a1024|1024 rows=8 wall=5.27s peak_gpu_mb=1146
+2026-11-16 15:18:24,791 INFO gate fit electricity seed=2 n_val=2000 nearest_is_best=0.594 tau_mult=0.316 (+bias 0.333) val_loss heuristic=0.26200 tuned=0.23774 +bias=0.23514
+2026-11-16 15:18:24,869 INFO cell 24/108 coreset|electricity|s1|r2|cluster_experts_tuned|a1024|1024 rows=12 wall=8.15s peak_gpu_mb=1146
+2026-11-16 15:18:42,962 INFO cell 25/108 coreset|electricity|s2|r0|full|full|31718 rows=4 wall=18.09s peak_gpu_mb=1873
+2026-11-16 15:18:47,346 INFO cell 26/108 coreset|electricity|s2|r0|perest_random|a1024|1024 rows=4 wall=4.38s peak_gpu_mb=1146
+2026-11-16 15:18:52,378 INFO cell 27/108 coreset|electricity|s2|r0|cluster_experts|a1024|1024 rows=8 wall=5.03s peak_gpu_mb=1146
+2026-11-16 15:18:59,562 INFO gate fit electricity seed=0 n_val=2000 nearest_is_best=0.565 tau_mult=0.251 (+bias 0.278) val_loss heuristic=0.24526 tuned=0.21796 +bias=0.21734
+2026-11-16 15:18:59,651 INFO cell 28/108 coreset|electricity|s2|r0|cluster_experts_tuned|a1024|1024 rows=12 wall=7.27s peak_gpu_mb=1146
+2026-11-16 15:19:18,107 INFO cell 29/108 coreset|electricity|s2|r1|full|full|31718 rows=4 wall=18.46s peak_gpu_mb=1873
+2026-11-16 15:19:22,634 INFO cell 30/108 coreset|electricity|s2|r1|perest_random|a1024|1024 rows=4 wall=4.53s peak_gpu_mb=1146
+2026-11-16 15:19:28,091 INFO cell 31/108 coreset|electricity|s2|r1|cluster_experts|a1024|1024 rows=8 wall=5.46s peak_gpu_mb=1146
+2026-11-16 15:19:36,282 INFO gate fit electricity seed=1 n_val=2000 nearest_is_best=0.590 tau_mult=0.0398 (+bias 0.0467) val_loss heuristic=0.28447 tuned=0.25853 +bias=0.25831
+2026-11-16 15:19:36,362 INFO cell 32/108 coreset|electricity|s2|r1|cluster_experts_tuned|a1024|1024 rows=12 wall=8.27s peak_gpu_mb=1146
+2026-11-16 15:19:54,831 INFO cell 33/108 coreset|electricity|s2|r2|full|full|31718 rows=4 wall=18.47s peak_gpu_mb=1873
+2026-11-16 15:19:59,167 INFO cell 34/108 coreset|electricity|s2|r2|perest_random|a1024|1024 rows=4 wall=4.33s peak_gpu_mb=1146
+2026-11-16 15:20:04,120 INFO cell 35/108 coreset|electricity|s2|r2|cluster_experts|a1024|1024 rows=8 wall=4.95s peak_gpu_mb=1146
+2026-11-16 15:20:12,159 INFO gate fit electricity seed=2 n_val=2000 nearest_is_best=0.628 tau_mult=0.158 (+bias 0.16) val_loss heuristic=0.23558 tuned=0.20063 +bias=0.20019
+2026-11-16 15:20:12,229 INFO cell 36/108 coreset|electricity|s2|r2|cluster_experts_tuned|a1024|1024 rows=12 wall=8.11s peak_gpu_mb=1146
+2026-11-16 15:20:40,319 INFO cell 37/108 coreset|houses|s0|r0|full|full|14448 rows=2 wall=28.09s peak_gpu_mb=2021
+2026-11-16 15:21:04,347 INFO cell 38/108 coreset|houses|s0|r0|perest_random|a1024|1024 rows=2 wall=24.03s peak_gpu_mb=2021
+2026-11-16 15:21:48,061 INFO cell 39/108 coreset|houses|s0|r0|cluster_experts|a1024|1024 rows=4 wall=43.71s peak_gpu_mb=2021
+2026-11-16 15:21:57,104 INFO gate fit houses seed=0 n_val=2000 nearest_is_best=0.301 tau_mult=1 (+bias 0.94) val_loss heuristic=0.13878 tuned=0.13878 +bias=0.13833
+2026-11-16 15:22:53,998 INFO cell 40/108 coreset|houses|s0|r0|cluster_experts_tuned|a1024|1024 rows=6 wall=65.93s peak_gpu_mb=2021
+2026-11-16 15:23:21,787 INFO cell 41/108 coreset|houses|s0|r1|full|full|14448 rows=2 wall=27.79s peak_gpu_mb=2021
+2026-11-16 15:23:45,726 INFO cell 42/108 coreset|houses|s0|r1|perest_random|a1024|1024 rows=2 wall=23.94s peak_gpu_mb=2021
+2026-11-16 15:24:29,282 INFO cell 43/108 coreset|houses|s0|r1|cluster_experts|a1024|1024 rows=4 wall=43.55s peak_gpu_mb=2021
+2026-11-16 15:24:38,136 INFO gate fit houses seed=1 n_val=2000 nearest_is_best=0.293 tau_mult=0.794 (+bias 0.824) val_loss heuristic=0.11419 tuned=0.11397 +bias=0.11251
+2026-11-16 15:25:34,543 INFO cell 44/108 coreset|houses|s0|r1|cluster_experts_tuned|a1024|1024 rows=6 wall=65.26s peak_gpu_mb=2021
+2026-11-16 15:26:01,818 INFO cell 45/108 coreset|houses|s0|r2|full|full|14448 rows=2 wall=27.27s peak_gpu_mb=2021
+2026-11-16 15:26:25,580 INFO cell 46/108 coreset|houses|s0|r2|perest_random|a1024|1024 rows=2 wall=23.76s peak_gpu_mb=2021
+2026-11-16 15:27:08,624 INFO cell 47/108 coreset|houses|s0|r2|cluster_experts|a1024|1024 rows=4 wall=43.04s peak_gpu_mb=2021
+2026-11-16 15:27:19,321 INFO gate fit houses seed=2 n_val=2000 nearest_is_best=0.286 tau_mult=1 (+bias 0.985) val_loss heuristic=0.13313 tuned=0.13313 +bias=0.13173
+2026-11-16 15:28:16,919 INFO cell 48/108 coreset|houses|s0|r2|cluster_experts_tuned|a1024|1024 rows=6 wall=68.29s peak_gpu_mb=2021
+2026-11-16 15:28:44,581 INFO cell 49/108 coreset|houses|s1|r0|full|full|14448 rows=2 wall=27.66s peak_gpu_mb=2021
+2026-11-16 15:29:08,513 INFO cell 50/108 coreset|houses|s1|r0|perest_random|a1024|1024 rows=2 wall=23.93s peak_gpu_mb=2021
+2026-11-16 15:29:51,115 INFO cell 51/108 coreset|houses|s1|r0|cluster_experts|a1024|1024 rows=4 wall=42.60s peak_gpu_mb=2021
+2026-11-16 15:30:00,104 INFO gate fit houses seed=0 n_val=2000 nearest_is_best=0.292 tau_mult=0.794 (+bias 0.885) val_loss heuristic=0.11975 tuned=0.11967 +bias=0.11892
+2026-11-16 15:30:56,903 INFO cell 52/108 coreset|houses|s1|r0|cluster_experts_tuned|a1024|1024 rows=6 wall=65.79s peak_gpu_mb=2021
+2026-11-16 15:31:24,376 INFO cell 53/108 coreset|houses|s1|r1|full|full|14448 rows=2 wall=27.47s peak_gpu_mb=2021
+2026-11-16 15:31:48,709 INFO cell 54/108 coreset|houses|s1|r1|perest_random|a1024|1024 rows=2 wall=24.33s peak_gpu_mb=2021
+2026-11-16 15:32:31,833 INFO cell 55/108 coreset|houses|s1|r1|cluster_experts|a1024|1024 rows=4 wall=43.12s peak_gpu_mb=2021
+2026-11-16 15:32:40,182 INFO gate fit houses seed=1 n_val=2000 nearest_is_best=0.319 tau_mult=0.794 (+bias 0.814) val_loss heuristic=0.13698 tuned=0.13668 +bias=0.13592
+2026-11-16 15:33:36,981 INFO cell 56/108 coreset|houses|s1|r1|cluster_experts_tuned|a1024|1024 rows=6 wall=65.15s peak_gpu_mb=2021
+2026-11-16 15:34:04,455 INFO cell 57/108 coreset|houses|s1|r2|full|full|14448 rows=2 wall=27.47s peak_gpu_mb=2021
+2026-11-16 15:34:28,256 INFO cell 58/108 coreset|houses|s1|r2|perest_random|a1024|1024 rows=2 wall=23.80s peak_gpu_mb=2021
+2026-11-16 15:35:11,167 INFO cell 59/108 coreset|houses|s1|r2|cluster_experts|a1024|1024 rows=4 wall=42.91s peak_gpu_mb=2021
+2026-11-16 15:35:20,631 INFO gate fit houses seed=2 n_val=2000 nearest_is_best=0.292 tau_mult=0.794 (+bias 0.817) val_loss heuristic=0.11744 tuned=0.11725 +bias=0.11660
+2026-11-16 15:36:17,607 INFO cell 60/108 coreset|houses|s1|r2|cluster_experts_tuned|a1024|1024 rows=6 wall=66.44s peak_gpu_mb=2021
+2026-11-16 15:36:45,268 INFO cell 61/108 coreset|houses|s2|r0|full|full|14448 rows=2 wall=27.66s peak_gpu_mb=2021
+2026-11-16 15:37:09,055 INFO cell 62/108 coreset|houses|s2|r0|perest_random|a1024|1024 rows=2 wall=23.79s peak_gpu_mb=2021
+2026-11-16 15:37:52,837 INFO cell 63/108 coreset|houses|s2|r0|cluster_experts|a1024|1024 rows=4 wall=43.78s peak_gpu_mb=2021
+2026-11-16 15:38:02,840 INFO gate fit houses seed=0 n_val=2000 nearest_is_best=0.277 tau_mult=1 (+bias 1.03) val_loss heuristic=0.13122 tuned=0.13122 +bias=0.13040
+2026-11-16 15:39:00,070 INFO cell 64/108 coreset|houses|s2|r0|cluster_experts_tuned|a1024|1024 rows=6 wall=67.23s peak_gpu_mb=2021
+2026-11-16 15:39:27,959 INFO cell 65/108 coreset|houses|s2|r1|full|full|14448 rows=2 wall=27.89s peak_gpu_mb=2021
+2026-11-16 15:39:52,557 INFO cell 66/108 coreset|houses|s2|r1|perest_random|a1024|1024 rows=2 wall=24.60s peak_gpu_mb=2021
+2026-11-16 15:40:36,655 INFO cell 67/108 coreset|houses|s2|r1|cluster_experts|a1024|1024 rows=4 wall=44.10s peak_gpu_mb=2021
+2026-11-16 15:40:46,742 INFO gate fit houses seed=1 n_val=2000 nearest_is_best=0.285 tau_mult=0.631 (+bias 0.7) val_loss heuristic=0.13620 tuned=0.13524 +bias=0.13447
+2026-11-16 15:41:44,299 INFO cell 68/108 coreset|houses|s2|r1|cluster_experts_tuned|a1024|1024 rows=6 wall=67.64s peak_gpu_mb=2021
+2026-11-16 15:42:11,779 INFO cell 69/108 coreset|houses|s2|r2|full|full|14448 rows=2 wall=27.48s peak_gpu_mb=2021
+2026-11-16 15:42:36,688 INFO cell 70/108 coreset|houses|s2|r2|perest_random|a1024|1024 rows=2 wall=24.91s peak_gpu_mb=2021
+2026-11-16 15:43:20,798 INFO cell 71/108 coreset|houses|s2|r2|cluster_experts|a1024|1024 rows=4 wall=44.11s peak_gpu_mb=2021
+2026-11-16 15:43:29,347 INFO gate fit houses seed=2 n_val=2000 nearest_is_best=0.246 tau_mult=0.794 (+bias 0.821) val_loss heuristic=0.12411 tuned=0.12411 +bias=0.12265
+2026-11-16 15:44:26,184 INFO cell 72/108 coreset|houses|s2|r2|cluster_experts_tuned|a1024|1024 rows=6 wall=65.38s peak_gpu_mb=2021
+2026-11-16 15:44:28,613 INFO cell 73/108 coreset|phoneme|s0|r0|full|full|3782 rows=4 wall=2.43s peak_gpu_mb=968
+2026-11-16 15:44:31,983 INFO cell 74/108 coreset|phoneme|s0|r0|perest_random|a1024|1024 rows=4 wall=3.37s peak_gpu_mb=957
+2026-11-16 15:44:36,788 INFO cell 75/108 coreset|phoneme|s0|r0|cluster_experts|a1024|1024 rows=8 wall=4.80s peak_gpu_mb=957
+2026-11-16 15:44:44,033 INFO gate fit phoneme seed=0 n_val=756 nearest_is_best=0.472 tau_mult=0.794 (+bias 0.954) val_loss heuristic=0.21277 tuned=0.21267 +bias=0.21135
+2026-11-16 15:44:44,073 INFO cell 76/108 coreset|phoneme|s0|r0|cluster_experts_tuned|a1024|1024 rows=12 wall=7.28s peak_gpu_mb=957
+2026-11-16 15:44:47,082 INFO cell 77/108 coreset|phoneme|s0|r1|full|full|3782 rows=4 wall=3.01s peak_gpu_mb=968
+2026-11-16 15:44:50,643 INFO cell 78/108 coreset|phoneme|s0|r1|perest_random|a1024|1024 rows=4 wall=3.56s peak_gpu_mb=957
+2026-11-16 15:44:55,859 INFO cell 79/108 coreset|phoneme|s0|r1|cluster_experts|a1024|1024 rows=8 wall=5.21s peak_gpu_mb=957
+2026-11-16 15:45:02,871 INFO gate fit phoneme seed=1 n_val=756 nearest_is_best=0.484 tau_mult=0.398 (+bias 0.416) val_loss heuristic=0.20395 tuned=0.20162 +bias=0.20133
+2026-11-16 15:45:02,916 INFO cell 80/108 coreset|phoneme|s0|r1|cluster_experts_tuned|a1024|1024 rows=12 wall=7.06s peak_gpu_mb=957
+2026-11-16 15:45:05,846 INFO cell 81/108 coreset|phoneme|s0|r2|full|full|3782 rows=4 wall=2.93s peak_gpu_mb=968
+2026-11-16 15:45:08,511 INFO cell 82/108 coreset|phoneme|s0|r2|perest_random|a1024|1024 rows=4 wall=2.66s peak_gpu_mb=957
+2026-11-16 15:45:12,353 INFO cell 83/108 coreset|phoneme|s0|r2|cluster_experts|a1024|1024 rows=8 wall=3.84s peak_gpu_mb=957
+2026-11-16 15:45:19,272 INFO gate fit phoneme seed=2 n_val=756 nearest_is_best=0.472 tau_mult=0.158 (+bias 0.248) val_loss heuristic=0.22778 tuned=0.22565 +bias=0.22542
+2026-11-16 15:45:19,318 INFO cell 84/108 coreset|phoneme|s0|r2|cluster_experts_tuned|a1024|1024 rows=12 wall=6.96s peak_gpu_mb=957
+2026-11-16 15:45:22,200 INFO cell 85/108 coreset|phoneme|s1|r0|full|full|3782 rows=4 wall=2.88s peak_gpu_mb=968
+2026-11-16 15:45:25,739 INFO cell 86/108 coreset|phoneme|s1|r0|perest_random|a1024|1024 rows=4 wall=3.54s peak_gpu_mb=957
+2026-11-16 15:45:30,751 INFO cell 87/108 coreset|phoneme|s1|r0|cluster_experts|a1024|1024 rows=8 wall=5.01s peak_gpu_mb=957
+2026-11-16 15:45:37,430 INFO gate fit phoneme seed=0 n_val=756 nearest_is_best=0.481 tau_mult=0.501 (+bias 0.629) val_loss heuristic=0.20813 tuned=0.20699 +bias=0.20656
+2026-11-16 15:45:37,466 INFO cell 88/108 coreset|phoneme|s1|r0|cluster_experts_tuned|a1024|1024 rows=12 wall=6.71s peak_gpu_mb=957
+2026-11-16 15:45:39,894 INFO cell 89/108 coreset|phoneme|s1|r1|full|full|3782 rows=4 wall=2.43s peak_gpu_mb=968
+2026-11-16 15:45:42,804 INFO cell 90/108 coreset|phoneme|s1|r1|perest_random|a1024|1024 rows=4 wall=2.91s peak_gpu_mb=957
+2026-11-16 15:45:47,391 INFO cell 91/108 coreset|phoneme|s1|r1|cluster_experts|a1024|1024 rows=8 wall=4.59s peak_gpu_mb=957
+2026-11-16 15:45:53,668 INFO gate fit phoneme seed=1 n_val=756 nearest_is_best=0.402 tau_mult=0.631 (+bias 0.688) val_loss heuristic=0.17831 tuned=0.17764 +bias=0.17752
+2026-11-16 15:45:53,711 INFO cell 92/108 coreset|phoneme|s1|r1|cluster_experts_tuned|a1024|1024 rows=12 wall=6.32s peak_gpu_mb=957
+2026-11-16 15:45:56,212 INFO cell 93/108 coreset|phoneme|s1|r2|full|full|3782 rows=4 wall=2.50s peak_gpu_mb=968
+2026-11-16 15:45:59,443 INFO cell 94/108 coreset|phoneme|s1|r2|perest_random|a1024|1024 rows=4 wall=3.23s peak_gpu_mb=957
+2026-11-16 15:46:03,928 INFO cell 95/108 coreset|phoneme|s1|r2|cluster_experts|a1024|1024 rows=8 wall=4.48s peak_gpu_mb=957
+2026-11-16 15:46:10,119 INFO gate fit phoneme seed=2 n_val=756 nearest_is_best=0.454 tau_mult=0.631 (+bias 0.71) val_loss heuristic=0.20903 tuned=0.20845 +bias=0.20724
+2026-11-16 15:46:10,149 INFO cell 96/108 coreset|phoneme|s1|r2|cluster_experts_tuned|a1024|1024 rows=12 wall=6.22s peak_gpu_mb=957
+2026-11-16 15:46:12,575 INFO cell 97/108 coreset|phoneme|s2|r0|full|full|3782 rows=4 wall=2.43s peak_gpu_mb=968
+2026-11-16 15:46:15,606 INFO cell 98/108 coreset|phoneme|s2|r0|perest_random|a1024|1024 rows=4 wall=3.03s peak_gpu_mb=957
+2026-11-16 15:46:20,474 INFO cell 99/108 coreset|phoneme|s2|r0|cluster_experts|a1024|1024 rows=8 wall=4.87s peak_gpu_mb=957
+2026-11-16 15:46:27,129 INFO gate fit phoneme seed=0 n_val=756 nearest_is_best=0.440 tau_mult=0.794 (+bias 0.745) val_loss heuristic=0.17770 tuned=0.17706 +bias=0.17692
+2026-11-16 15:46:27,169 INFO cell 100/108 coreset|phoneme|s2|r0|cluster_experts_tuned|a1024|1024 rows=12 wall=6.69s peak_gpu_mb=957
+2026-11-16 15:46:29,614 INFO cell 101/108 coreset|phoneme|s2|r1|full|full|3782 rows=4 wall=2.44s peak_gpu_mb=968
+2026-11-16 15:46:32,588 INFO cell 102/108 coreset|phoneme|s2|r1|perest_random|a1024|1024 rows=4 wall=2.97s peak_gpu_mb=957
+2026-11-16 15:46:36,339 INFO cell 103/108 coreset|phoneme|s2|r1|cluster_experts|a1024|1024 rows=8 wall=3.75s peak_gpu_mb=957
+2026-11-16 15:46:43,112 INFO gate fit phoneme seed=1 n_val=756 nearest_is_best=0.450 tau_mult=1 (+bias 0.935) val_loss heuristic=0.20815 tuned=0.20815 +bias=0.20577
+2026-11-16 15:46:43,146 INFO cell 104/108 coreset|phoneme|s2|r1|cluster_experts_tuned|a1024|1024 rows=12 wall=6.81s peak_gpu_mb=957
+2026-11-16 15:46:46,071 INFO cell 105/108 coreset|phoneme|s2|r2|full|full|3782 rows=4 wall=2.92s peak_gpu_mb=968
+2026-11-16 15:46:49,857 INFO cell 106/108 coreset|phoneme|s2|r2|perest_random|a1024|1024 rows=4 wall=3.78s peak_gpu_mb=957
+2026-11-16 15:46:54,877 INFO cell 107/108 coreset|phoneme|s2|r2|cluster_experts|a1024|1024 rows=8 wall=5.02s peak_gpu_mb=957
+2026-11-16 15:47:02,106 INFO gate fit phoneme seed=2 n_val=756 nearest_is_best=0.455 tau_mult=1 (+bias 0.929) val_loss heuristic=0.21684 tuned=0.21684 +bias=0.21498
+2026-11-16 15:47:02,146 INFO cell 108/108 coreset|phoneme|s2|r2|cluster_experts_tuned|a1024|1024 rows=12 wall=7.27s peak_gpu_mb=957

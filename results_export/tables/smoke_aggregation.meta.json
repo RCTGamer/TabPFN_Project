@@ -1,0 +1,246 @@
+{
+  "backend": {
+    "alpha": 0.01,
+    "eps": 0.001,
+    "max_depth": null,
+    "n_bins": 40,
+    "n_trees": 10,
+    "name": "sklearn"
+  },
+  "backend_meta": {
+    "backend": "sklearn",
+    "n_estimators_": 4,
+    "params": {
+      "alpha": 0.01,
+      "eps": 0.001,
+      "max_depth": null,
+      "n_bins": 40,
+      "n_trees": 10,
+      "name": "sklearn"
+    }
+  },
+  "config": {
+    "aggregator_kwargs": {},
+    "aggregators": [
+      "mean",
+      "logit_mean",
+      "median",
+      "trimmed_mean",
+      "entropy_weighted",
+      "val_weighted",
+      "mean_temp_offline"
+    ],
+    "alpha": 0.05,
+    "backend": {
+      "n_trees": 10,
+      "name": "sklearn"
+    },
+    "budget_absolute": [],
+    "budget_fractions": [
+      0.5,
+      0.3
+    ],
+    "cache_dir": "results/raw/smoke",
+    "coreset_kwargs": {
+      "embedding_kmeans": {
+        "pilot": 100
+      },
+      "uncertainty_mix": {
+        "frac_hard": 0.5,
+        "pilot": 100
+      }
+    },
+    "coreset_methods": [
+      "random",
+      "stratified",
+      "balanced",
+      "kmeans_stratified",
+      "uncertainty_mix",
+      "embedding_kmeans",
+      "perest_random",
+      "perest_partition",
+      "builtin_subsample",
+      "builtin_majority_downsample"
+    ],
+    "datasets": {
+      "confirm": [
+        {
+          "data_seed": 2,
+          "imbalance": 0.15,
+          "n": 600,
+          "n_classes": 2,
+          "n_features": 6,
+          "name": "syn_clf_a",
+          "noise": 0.02,
+          "source": "synthetic",
+          "task": "classification"
+        },
+        {
+          "data_seed": 3,
+          "imbalance": [
+            0.8,
+            0.12,
+            0.08
+          ],
+          "n": 400,
+          "n_features": 8,
+          "name": "syn_clf_b",
+          "noise": 0.02,
+          "source": "synthetic",
+          "task": "classification"
+        },
+        {
+          "data_seed": 4,
+          "n": 400,
+          "n_features": 5,
+          "name": "syn_reg",
+          "source": "synthetic",
+          "task": "regression"
+        }
+      ],
+      "dev": [
+        {
+          "data_seed": 1,
+          "imbalance": [
+            0.8,
+            0.12,
+            0.08
+          ],
+          "n": 500,
+          "n_features": 6,
+          "name": "syn_clf_dev",
+          "noise": 0.02,
+          "source": "synthetic",
+          "task": "classification"
+        }
+      ]
+    },
+    "experiment": "aggregation",
+    "learning_curve_points": 6,
+    "log_dir": "results/logs",
+    "min_detectable_effect": 0.05,
+    "n_estimators": [
+      1,
+      4
+    ],
+    "name": "smoke",
+    "out_csv": "results/tables/smoke_aggregation.csv",
+    "planning": {
+      "sd_dataset": 0.02,
+      "sd_seed": 0.03
+    },
+    "quantile_levels": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.425,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.725,
+      0.75,
+      0.775,
+      0.8,
+      0.825,
+      0.85,
+      0.875,
+      0.9,
+      0.925,
+      0.95,
+      0.975
+    ],
+    "references": [
+      "native",
+      "native_tuned"
+    ],
+    "reg_aggregators": [
+      "mixture",
+      "log_pool",
+      "quantile_mean",
+      "quantile_median"
+    ],
+    "seeds": [
+      0,
+      1
+    ],
+    "selection_seeds": [
+      0,
+      1
+    ],
+    "split_seeds": [
+      0
+    ],
+    "test_size": 0.3,
+    "val_fraction": 0.2
+  },
+  "expected": {
+    "datasets": {
+      "syn_clf_a": "classification",
+      "syn_clf_b": "classification",
+      "syn_clf_dev": "classification",
+      "syn_reg": "regression"
+    },
+    "methods": {
+      "classification": [
+        "single",
+        "mean",
+        "logit_mean",
+        "median",
+        "trimmed_mean",
+        "entropy_weighted",
+        "val_weighted",
+        "mean_temp_offline",
+        "native",
+        "native_tuned"
+      ],
+      "regression": [
+        "single",
+        "mixture",
+        "log_pool",
+        "quantile_mean",
+        "quantile_median",
+        "native"
+      ]
+    },
+    "seeds": [
+      0,
+      1
+    ]
+  },
+  "experiment": "aggregation",
+  "n_cells": 8,
+  "shard": null,
+  "split_hashes": {
+    "syn_clf_a|0": "65f668c0783fdad6",
+    "syn_clf_a|1": "74a1085e6ebb3530",
+    "syn_clf_b|0": "7b5a751fa9321f90",
+    "syn_clf_b|1": "67f4f03ce48031ef",
+    "syn_clf_dev|0": "4f25ca0d5bbe4567",
+    "syn_clf_dev|1": "fd9dd5202e81d000",
+    "syn_reg|0": "dd5f36da03e0a90c",
+    "syn_reg|1": "5a3e83972b34ed79"
+  },
+  "split_seed_rule": "split_seed == seed",
+  "tabpfn_version": null
+}

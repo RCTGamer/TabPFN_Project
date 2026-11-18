@@ -1,0 +1,184 @@
+{
+  "backend": {
+    "fit_mode": "fit_preprocessors",
+    "inference_precision": "auto",
+    "name": "tabpfn-3.5",
+    "version": "3.5"
+  },
+  "backend_meta": {},
+  "config": {
+    "aggregator_kwargs": {},
+    "aggregators": [
+      "mean"
+    ],
+    "backend": {
+      "device": "cuda",
+      "fit_mode": "fit_preprocessors",
+      "name": "tabpfn",
+      "version": "3.5"
+    },
+    "cache_dir": "results/raw",
+    "datasets": {
+      "confirm": [],
+      "dev": [
+        {
+          "data_id": 31,
+          "name": "credit-g",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 1489,
+          "name": "phoneme",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 537,
+          "name": "houses",
+          "source": "openml",
+          "task": "regression"
+        }
+      ]
+    },
+    "experiment": "aggregation",
+    "log_dir": "results/logs",
+    "n_estimators": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "name": "aggregation_dev",
+    "out_csv": "results/tables/aggregation_dev.csv",
+    "quantile_levels": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.425,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.725,
+      0.75,
+      0.775,
+      0.8,
+      0.825,
+      0.85,
+      0.875,
+      0.9,
+      0.925,
+      0.95,
+      0.975
+    ],
+    "references": [
+      "native"
+    ],
+    "reg_aggregators": [
+      "mixture"
+    ],
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ],
+    "test_size": 0.3,
+    "val_fraction": 0.2
+  },
+  "expected": {
+    "datasets": {
+      "credit-g": "classification",
+      "houses": "regression",
+      "phoneme": "classification"
+    },
+    "methods": {
+      "classification": [
+        "single",
+        "mean",
+        "native"
+      ],
+      "regression": [
+        "single",
+        "mixture",
+        "native"
+      ]
+    },
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9
+    ]
+  },
+  "experiment": "aggregation",
+  "n_cells": 30,
+  "shard": null,
+  "split_hashes": {
+    "credit-g|0": "bbf057eb2666a16b",
+    "credit-g|1": "a7a05489d8d7b9ff",
+    "credit-g|2": "abe94090c58ebf2f",
+    "credit-g|3": "dc8401d1d001c3d0",
+    "credit-g|4": "48b51d779b3d41c0",
+    "credit-g|5": "d59741dc1f0d5d8c",
+    "credit-g|6": "e2d44332d95aa5d2",
+    "credit-g|7": "70da13edb8227c54",
+    "credit-g|8": "942066c970c838ce",
+    "credit-g|9": "ee1c0584ffebea10",
+    "houses|0": "4efd9329625d2681",
+    "houses|1": "822f972ddf510499",
+    "houses|2": "383c3248becb1a19",
+    "houses|3": "023b19ee237b559c",
+    "houses|4": "7b1f69b9e9f0e560",
+    "houses|5": "de7c64bc1297b93b",
+    "houses|6": "ead24c96e38df813",
+    "houses|7": "8862521aafc05874",
+    "houses|8": "fb92c8a83fde1b0e",
+    "houses|9": "87581a0172a05bb8",
+    "phoneme|0": "d27004160ba2e1bb",
+    "phoneme|1": "e9a83b0cb5559692",
+    "phoneme|2": "7de5f508c636cf03",
+    "phoneme|3": "14e9f0e1d168e2e9",
+    "phoneme|4": "e8085e2b771db709",
+    "phoneme|5": "223e4c34146f1ec2",
+    "phoneme|6": "82fbc5ceb5140e15",
+    "phoneme|7": "ae0756d087d0703e",
+    "phoneme|8": "ba65c119c3af736d",
+    "phoneme|9": "1548bcf913c6651c"
+  },
+  "split_seed_rule": "split_seed == seed",
+  "tabpfn_version": "9.0.0"
+}

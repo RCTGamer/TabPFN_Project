@@ -1,0 +1,9 @@
+2026-10-08 02:38:51,927 INFO run coreset_v1.shard0: 11460 cells (0 already done) -> results/tables/coreset_v1.shard0.csv
+2026-10-08 02:39:41,012 INFO cell 1/11460 coreset|electricity|s0|r0|full|full|31718 rows=4 wall=49.08s peak_gpu_mb=1873
+2026-10-08 02:40:00,903 INFO cell 2/11460 coreset|electricity|s0|r0|stratified|f0.5|15859 rows=4 wall=19.89s peak_gpu_mb=1495
+2026-10-08 02:40:21,084 INFO cell 3/11460 coreset|electricity|s0|r0|kmeans_stratified|f0.5|15859 rows=4 wall=20.18s peak_gpu_mb=1495
+2026-10-08 02:40:46,517 INFO cell 4/11460 coreset|electricity|s0|r0|embedding_kmeans|f0.5|15859 rows=4 wall=25.43s peak_gpu_mb=1495
+2026-10-08 02:41:24,971 INFO cell 5/11460 coreset|electricity|s0|r0|perest_partition|f0.5|15859 rows=4 wall=38.45s peak_gpu_mb=1486
+2026-10-08 02:41:44,253 INFO cell 6/11460 coreset|electricity|s0|r0|builtin_majority_downsample|f0.5|15859 rows=4 wall=19.28s peak_gpu_mb=1495
+2026-10-08 02:41:55,304 INFO cell 7/11460 coreset|electricity|s0|r0|stratified|f0.2|6344 rows=4 wall=11.05s peak_gpu_mb=1271
+2026-10-08 02:42:06,609 INFO cell 8/11460 coreset|electricity|s0|r0|kmeans_stratified|f0.2|6344 rows=4 wall=11.30s peak_gpu_mb=1271

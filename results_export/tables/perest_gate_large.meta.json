@@ -1,0 +1,387 @@
+{
+  "backend": {
+    "fit_mode": "fit_preprocessors",
+    "inference_precision": "auto",
+    "name": "tabpfn-3.5",
+    "version": "3.5"
+  },
+  "backend_meta": {
+    "backend": "tabpfn-3.5",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A6000",
+    "inference_config": {
+      "CLASS_SHIFT_METHOD": "shuffle",
+      "ENABLE_GPU_PREPROCESSING": true,
+      "FEATURE_SHIFT_METHOD": "shuffle",
+      "FEATURE_SUBSAMPLING_CONSTANT_FEATURE_COUNT": 50,
+      "FEATURE_SUBSAMPLING_IMPORTANCE_TOP_K_COUNT": 150,
+      "FEATURE_SUBSAMPLING_METHOD": "balanced",
+      "FINGERPRINT_FEATURE": true,
+      "FIX_NAN_BORDERS_AFTER_TARGET_TRANSFORM": true,
+      "MAX_CPU_SAMPLES": 5000,
+      "MAX_NUMBER_OF_CLASSES": 160,
+      "MAX_NUMBER_OF_FEATURES": 20000,
+      "MAX_NUMBER_OF_SAMPLES": 1000000,
+      "MAX_UNIQUE_FOR_CATEGORICAL_FEATURES": 1000000,
+      "MIN_CARDINALITY_FOR_TEXT": 30,
+      "MIN_NUMBER_SAMPLES_FOR_CATEGORICAL_INFERENCE": 100,
+      "MIN_UNIQUE_FOR_NUMERICAL_FEATURES": 4,
+      "N_ESTIMATORS": 8,
+      "OUTLIER_REMOVAL_STD": 12.0,
+      "PASSTHROUGH_INF": false,
+      "POLYNOMIAL_FEATURES": "no",
+      "PREPROCESS_TRANSFORMS": [
+        {
+          "append_original": false,
+          "categorical_name": "ordinal_shuffled",
+          "differentiable": false,
+          "global_transformer_name": null,
+          "max_features_per_estimator": 768,
+          "max_onehot_cardinality": null,
+          "name": "none"
+        }
+      ],
+      "REGRESSION_Y_PREPROCESS_TRANSFORMS": [
+        null,
+        "safepower"
+      ],
+      "SAMPLE_SUBSAMPLING_METHOD": "auto",
+      "SOFTMAX_TEMPERATURE": 1.0,
+      "SUBSAMPLE_SAMPLES": null,
+      "TEXT_N_COMPONENTS": 30,
+      "TRANSFORM_DATES": true,
+      "TRANSFORM_TEXT": true,
+      "USE_SKLEARN_16_DECIMAL_PRECISION": false,
+      "_CLASSIFICATION_DEFAULT_OUTLIER_REMOVAL_STD": 12.0,
+      "_REGRESSION_DEFAULT_OUTLIER_REMOVAL_STD": null
+    },
+    "inference_precision": "auto",
+    "model_version": "3.5",
+    "n_estimators_": 8,
+    "softmax_temperature": 1.0,
+    "tabpfn_version": "9.0.0",
+    "timing": {
+      "fit_seconds": 2.2551084021106362,
+      "predict_seconds": 16.88496181415394
+    }
+  },
+  "config": {
+    "aggregator": "mean",
+    "aggregator_kwargs": {},
+    "aggregators": [
+      "mean"
+    ],
+    "backend": {
+      "device": "cuda",
+      "fit_mode": "fit_preprocessors",
+      "name": "tabpfn",
+      "version": "3.5"
+    },
+    "baseline": "perest_random",
+    "budget_absolute": [
+      1024
+    ],
+    "budget_fractions": [],
+    "cache_dir": null,
+    "combined_aggregators": [],
+    "coreset_kwargs": {
+      "cluster_experts_tuned": {
+        "val_fraction": 0.2,
+        "val_max": 2000
+      }
+    },
+    "coreset_methods": [
+      "perest_random",
+      "cluster_experts",
+      "cluster_experts_tuned"
+    ],
+    "datasets": {
+      "confirm": [],
+      "dev": [
+        {
+          "data_id": 151,
+          "name": "electricity",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 41027,
+          "name": "jungle_chess",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 41168,
+          "name": "jannis",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 23512,
+          "name": "higgs",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 574,
+          "name": "house_16H",
+          "source": "openml",
+          "task": "regression"
+        },
+        {
+          "data_id": 564,
+          "name": "fried",
+          "source": "openml",
+          "task": "regression"
+        }
+      ]
+    },
+    "experiment": "coreset",
+    "learning_curve_points": 6,
+    "local_groups": 8,
+    "local_ratios": [
+      0.5,
+      0.75,
+      0.9,
+      1.0
+    ],
+    "log_dir": "results/logs",
+    "n_estimators": 8,
+    "name": "perest_gate_large",
+    "out_csv": "results/tables/perest_gate_large.csv",
+    "perest_mode": "single_fit",
+    "quantile_levels": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.425,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.725,
+      0.75,
+      0.775,
+      0.8,
+      0.825,
+      0.85,
+      0.875,
+      0.9,
+      0.925,
+      0.95,
+      0.975
+    ],
+    "references": [
+      "native",
+      "native_tuned"
+    ],
+    "reg_aggregators": [
+      "mixture",
+      "log_pool",
+      "quantile_mean",
+      "quantile_median"
+    ],
+    "seeds": [
+      0
+    ],
+    "selection_seeds": [
+      0,
+      1
+    ],
+    "split_seeds": [
+      0,
+      1,
+      2
+    ],
+    "test_size": 0.3,
+    "val_fraction": 0.2
+  },
+  "expected": {
+    "budgets": {
+      "electricity": [
+        1024
+      ],
+      "fried": [
+        1024
+      ],
+      "higgs": [
+        1024
+      ],
+      "house_16H": [
+        1024
+      ],
+      "jannis": [
+        1024
+      ],
+      "jungle_chess": [
+        1024
+      ]
+    },
+    "datasets": {
+      "electricity": "classification",
+      "fried": "regression",
+      "higgs": "classification",
+      "house_16H": "regression",
+      "jannis": "classification",
+      "jungle_chess": "classification"
+    },
+    "methods": {
+      "classification": [
+        "full",
+        "perest_random",
+        "cluster_experts",
+        "cluster_experts+gate",
+        "cluster_experts_tuned",
+        "cluster_experts_tuned+bias",
+        "cluster_experts_tuned+heuristic"
+      ],
+      "regression": [
+        "full",
+        "perest_random",
+        "cluster_experts",
+        "cluster_experts+gate",
+        "cluster_experts_tuned",
+        "cluster_experts_tuned+bias",
+        "cluster_experts_tuned+heuristic"
+      ]
+    },
+    "required_baselines": [
+      "full"
+    ],
+    "seeds": [
+      0,
+      1
+    ]
+  },
+  "experiment": "coreset",
+  "family": [],
+  "grids": {
+    "electricity": {
+      "budgets": {
+        "a1024": 1024
+      },
+      "learning_curve": [
+        10,
+        44,
+        191,
+        832,
+        3633,
+        15859
+      ],
+      "n_train": 31718
+    },
+    "fried": {
+      "budgets": {
+        "a1024": 1024
+      },
+      "learning_curve": [
+        10,
+        43,
+        183,
+        781,
+        3338,
+        14268
+      ],
+      "n_train": 28537
+    },
+    "higgs": {
+      "budgets": {
+        "a1024": 1024
+      },
+      "learning_curve": [
+        10,
+        51,
+        260,
+        1322,
+        6736,
+        34317
+      ],
+      "n_train": 68635
+    },
+    "house_16H": {
+      "budgets": {
+        "a1024": 1024
+      },
+      "learning_curve": [
+        10,
+        38,
+        145,
+        551,
+        2096,
+        7974
+      ],
+      "n_train": 15948
+    },
+    "jannis": {
+      "budgets": {
+        "a1024": 1024
+      },
+      "learning_curve": [
+        20,
+        86,
+        369,
+        1587,
+        6820,
+        29306
+      ],
+      "n_train": 58613
+    },
+    "jungle_chess": {
+      "budgets": {
+        "a1024": 1024
+      },
+      "learning_curve": [
+        15,
+        60,
+        242,
+        972,
+        3905,
+        15686
+      ],
+      "n_train": 31373
+    }
+  },
+  "n_cells": 144,
+  "shard": null,
+  "split_hashes": {
+    "electricity|0": "08ac576dc1dc3ddd",
+    "electricity|1": "a5ecd644a6ca1eeb",
+    "electricity|2": "7c8890f0992f61f5",
+    "fried|0": "13d7111ad22ac2e6",
+    "fried|1": "fe84e258d8fce241",
+    "fried|2": "9c445f061174881a",
+    "higgs|0": "e2204e565c24d00a",
+    "higgs|1": "ceeff1e3bcd22475",
+    "higgs|2": "9d815f0edd3099f8",
+    "house_16H|0": "89bfe6801efa3bed",
+    "house_16H|1": "3c817b78661f952e",
+    "house_16H|2": "3b2a3f022909d3d5",
+    "jannis|0": "258f825bf615a87d",
+    "jannis|1": "43d152a21af206ae",
+    "jannis|2": "27df3b38968ae7ed",
+    "jungle_chess|0": "87718ab71d612a5b",
+    "jungle_chess|1": "69c10fdc5c9a9076",
+    "jungle_chess|2": "a5f563b013467952"
+  },
+  "tabpfn_version": "9.0.0"
+}

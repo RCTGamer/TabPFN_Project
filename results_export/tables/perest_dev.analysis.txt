@@ -1,0 +1,41 @@
+== coreset, dev datasets only (exploratory): paired vs perest_random, improvement > 0 is better, Holm-adjusted ==
+    dataset                method   metric         mean         se   improvement     imp_se       p_holm  significant_holm  total_seconds
+electricity        local_mix_r0.9 log_loss     0.258411   0.005293      0.106666   0.005450 4.054808e-06              True      17.784476
+electricity  cluster_experts+gate log_loss     0.259940   0.001732      0.105136   0.002676 2.070259e-08              True       5.912033
+electricity          local_mix_r1 log_loss     0.262529   0.006595      0.102547   0.006550 2.073513e-05              True      17.900942
+electricity       local_mix_r0.75 log_loss     0.263285   0.003907      0.101791   0.004284 9.327173e-07              True      18.528460
+electricity        local_mix_r0.5 log_loss     0.281799   0.002688      0.083278   0.003101 3.619091e-07              True      18.185841
+electricity      perest_partition log_loss     0.365107   0.001681     -0.000030   0.002120 1.000000e+00             False       4.665016
+electricity     builtin_subsample log_loss     0.365821   0.001326     -0.000744   0.001519 1.000000e+00             False       3.617981
+electricity     perest_stratified log_loss     0.365953   0.001503     -0.000877   0.002124 1.000000e+00             False       4.661491
+electricity perest_representative log_loss     0.367777   0.002385     -0.002701   0.003233 1.000000e+00             False       4.682492
+electricity       cluster_experts log_loss     0.456697   0.005323     -0.091621   0.006142 2.935602e-05              True       5.912033
+electricity        perest_kcenter log_loss     0.457518   0.003298     -0.092441   0.004338 2.153708e-06              True       9.891823
+electricity         perest_random log_loss     0.365076   0.001829           NaN        NaN          NaN             False       4.560879
+electricity                  full log_loss     0.077113   0.000919           NaN        NaN          NaN             False      20.813113
+     houses  cluster_experts+gate     rmse 43263.957650 127.344833   1072.668684 119.752315 1.132140e-03              True      38.615350
+     houses        local_mix_r0.5     rmse 43305.072808 105.956107   1031.553526 113.658126 1.045229e-03              True      36.089019
+     houses       local_mix_r0.75     rmse 43378.160567 123.896710    958.465767 143.166151 8.444181e-03              True      35.442217
+     houses        local_mix_r0.9     rmse 43695.029532 241.890521    641.596802 212.062900 7.389628e-01             False      36.307132
+     houses      perest_partition     rmse 44079.328745 101.237176    257.297590  78.420527 5.138729e-01             False      22.252891
+     houses perest_representative     rmse 44209.043595 156.397708    127.582740 135.341286 1.000000e+00             False      21.773495
+     houses     builtin_subsample     rmse 44249.837842  99.769876     86.788493  85.140916 1.000000e+00             False      21.086739
+     houses     perest_stratified     rmse 44356.456727 102.989863    -19.830392 108.986559 1.000000e+00             False      21.764019
+     houses          local_mix_r1     rmse 44363.098284 164.633102    -26.471950 155.548199 1.000000e+00             False      35.879139
+     houses        perest_kcenter     rmse 49570.917104 174.170555  -5234.290770 190.628922 3.070080e-07              True      22.269783
+     houses       cluster_experts     rmse 54658.323735 340.157823 -10321.697400 364.608522 2.462749e-07              True      38.615350
+     houses         perest_random     rmse 44336.626334 123.561818           NaN        NaN          NaN             False      22.178590
+     houses                  full     rmse 37427.424658  34.513196           NaN        NaN          NaN             False      25.646006
+    phoneme  cluster_experts+gate log_loss     0.184054   0.001596      0.067227   0.001766 2.643685e-08              True       3.676170
+    phoneme        local_mix_r0.5 log_loss     0.211288   0.003244      0.039994   0.001061 2.829643e-08              True      16.800454
+    phoneme       local_mix_r0.75 log_loss     0.212202   0.003239      0.039080   0.001078 3.776066e-08              True      16.447267
+    phoneme        local_mix_r0.9 log_loss     0.214925   0.003380      0.036357   0.001078 6.461054e-08              True      16.180840
+    phoneme          local_mix_r1 log_loss     0.216996   0.003421      0.034286   0.001171 1.908512e-07              True      16.747518
+    phoneme     builtin_subsample log_loss     0.249448   0.003302      0.001834   0.000867 1.000000e+00             False       2.296595
+    phoneme      perest_partition log_loss     0.250957   0.002783      0.000325   0.000717 1.000000e+00             False       3.386093
+    phoneme     perest_stratified log_loss     0.253378   0.003354     -0.002096   0.000748 9.706654e-01             False       3.223226
+    phoneme perest_representative log_loss     0.253465   0.003270     -0.002183   0.001270 1.000000e+00             False       3.182184
+    phoneme        perest_kcenter log_loss     0.323275   0.001327     -0.071993   0.002130 6.406648e-08              True       4.003443
+    phoneme       cluster_experts log_loss     0.352931   0.002801     -0.101650   0.003023 6.539543e-08              True       3.676170
+    phoneme         perest_random log_loss     0.251282   0.003160           NaN        NaN          NaN             False       3.254026
+    phoneme                  full log_loss     0.177744   0.001469           NaN        NaN          NaN             False       2.729886
