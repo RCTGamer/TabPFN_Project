@@ -1,0 +1,185 @@
+{
+  "backend": {
+    "alpha": 0.01,
+    "eps": 0.001,
+    "max_depth": null,
+    "n_bins": 40,
+    "n_trees": 10,
+    "name": "sklearn"
+  },
+  "backend_meta": {},
+  "config": {
+    "aggregator_kwargs": {},
+    "aggregators": [
+      "mean"
+    ],
+    "backend": {
+      "n_trees": 10,
+      "name": "sklearn"
+    },
+    "budget_factor": 2,
+    "budget_start": 64,
+    "cache_dir": null,
+    "datasets": {
+      "dev": [
+        {
+          "data_seed": 1,
+          "imbalance": [
+            0.6,
+            0.3,
+            0.1
+          ],
+          "n": 1000,
+          "n_classes": 3,
+          "n_features": 6,
+          "name": "syn_clf",
+          "noise": 0.02,
+          "source": "synthetic",
+          "task": "classification"
+        },
+        {
+          "data_seed": 4,
+          "n": 800,
+          "n_features": 5,
+          "name": "syn_reg",
+          "source": "synthetic",
+          "task": "regression"
+        }
+      ]
+    },
+    "experiment": "scaling",
+    "log_dir": "results/logs",
+    "max_budget": null,
+    "n_estimators": [
+      1,
+      2,
+      4
+    ],
+    "name": "scaling_smoke",
+    "out_csv": "results/tables/scaling_smoke.csv",
+    "quantile_levels": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.425,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.725,
+      0.75,
+      0.775,
+      0.8,
+      0.825,
+      0.85,
+      0.875,
+      0.9,
+      0.925,
+      0.95,
+      0.975
+    ],
+    "references": [
+      "native",
+      "native_tuned"
+    ],
+    "reg_aggregators": [
+      "mixture"
+    ],
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "test_size": 0.3,
+    "val_fraction": 0.2,
+    "warmup": true
+  },
+  "expected": {
+    "budgets": {
+      "syn_clf": [
+        64,
+        128,
+        256,
+        512,
+        700
+      ],
+      "syn_reg": [
+        64,
+        128,
+        256,
+        512,
+        560
+      ]
+    },
+    "datasets": {
+      "syn_clf": "classification",
+      "syn_reg": "regression"
+    },
+    "methods": {
+      "classification": [
+        "mean"
+      ],
+      "regression": [
+        "mixture"
+      ]
+    },
+    "seeds": [
+      0,
+      1,
+      2
+    ]
+  },
+  "experiment": "scaling",
+  "git_commit": "c4151277d78f97258847970be43bcd0b88f1c369",
+  "grids": {
+    "syn_clf": {
+      "budgets": [
+        64,
+        128,
+        256,
+        512,
+        700
+      ],
+      "n_train": 700
+    },
+    "syn_reg": {
+      "budgets": [
+        64,
+        128,
+        256,
+        512,
+        560
+      ],
+      "n_train": 560
+    }
+  },
+  "hostname": "songcpu6",
+  "n_cells": 90,
+  "shard": null,
+  "split_hashes": {
+    "syn_clf|0": "c61ecf7c8f0013a1",
+    "syn_reg|0": "5341e6d62b62592d"
+  },
+  "tabpfn_version": null,
+  "timing_csv": "results/tables/scaling_smoke.timing.csv"
+}

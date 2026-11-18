@@ -1,0 +1,14 @@
+== coreset, dev datasets only (exploratory): paired vs perest_random, improvement > 0 is better, Holm-adjusted ==
+    dataset        method   metric         mean         se  improvement     imp_se       p_holm  significant_holm  total_seconds
+electricity  crumb_perest log_loss     0.200317   0.002650     0.164760   0.002931 2.226012e-10              True      36.225703
+electricity         crumb log_loss     0.234150   0.003945     0.130927   0.003939 1.128233e-08              True      25.307617
+electricity perest_random log_loss     0.365076   0.001829          NaN        NaN          NaN             False       4.745506
+electricity          full log_loss     0.077113   0.000919          NaN        NaN          NaN             False      20.714432
+     houses  crumb_perest     rmse 41816.037580  94.881681  2520.588755 107.837640 1.431581e-07              True      48.884553
+     houses         crumb     rmse 43584.312855 157.901386   752.313480 163.708535 1.765941e-03              True      42.991694
+     houses perest_random     rmse 44336.626334 123.561818          NaN        NaN          NaN             False      24.858503
+     houses          full     rmse 37427.424658  34.513196          NaN        NaN          NaN             False      28.559172
+    phoneme         crumb log_loss     0.177267   0.001123     0.074014   0.002216 1.128233e-08              True      22.641428
+    phoneme  crumb_perest log_loss     0.196110   0.002484     0.055171   0.001012 2.566693e-10              True      23.740799
+    phoneme perest_random log_loss     0.251282   0.003160          NaN        NaN          NaN             False       3.698372
+    phoneme          full log_loss     0.177744   0.001469          NaN        NaN          NaN             False       3.640265

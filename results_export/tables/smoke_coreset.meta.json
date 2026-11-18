@@ -1,0 +1,958 @@
+{
+  "backend": {
+    "alpha": 0.01,
+    "eps": 0.001,
+    "max_depth": null,
+    "n_bins": 40,
+    "n_trees": 10,
+    "name": "sklearn"
+  },
+  "backend_meta": {},
+  "config": {
+    "aggregator": "mean",
+    "aggregator_kwargs": {},
+    "aggregators": [
+      "mean",
+      "logit_mean",
+      "median",
+      "trimmed_mean",
+      "entropy_weighted",
+      "val_weighted",
+      "mean_temp_offline"
+    ],
+    "alpha": 0.05,
+    "backend": {
+      "n_trees": 10,
+      "name": "sklearn"
+    },
+    "baseline": "random",
+    "budget_absolute": [],
+    "budget_fractions": [
+      0.5,
+      0.3
+    ],
+    "cache_dir": "results/raw/smoke",
+    "combined_aggregators": [],
+    "coreset_kwargs": {
+      "embedding_kmeans": {
+        "pilot": 100
+      },
+      "uncertainty_mix": {
+        "frac_hard": 0.5,
+        "pilot": 100
+      }
+    },
+    "coreset_methods": [
+      "random",
+      "stratified",
+      "balanced",
+      "kmeans_stratified",
+      "uncertainty_mix",
+      "embedding_kmeans",
+      "representative",
+      "perest_random",
+      "perest_partition",
+      "perest_representative",
+      "builtin_subsample",
+      "builtin_majority_downsample"
+    ],
+    "datasets": {
+      "confirm": [
+        {
+          "data_seed": 2,
+          "imbalance": 0.15,
+          "n": 600,
+          "n_classes": 2,
+          "n_features": 6,
+          "name": "syn_clf_a",
+          "noise": 0.02,
+          "source": "synthetic",
+          "task": "classification"
+        },
+        {
+          "data_seed": 3,
+          "imbalance": [
+            0.8,
+            0.12,
+            0.08
+          ],
+          "n": 400,
+          "n_features": 8,
+          "name": "syn_clf_b",
+          "noise": 0.02,
+          "source": "synthetic",
+          "task": "classification"
+        },
+        {
+          "data_seed": 4,
+          "n": 400,
+          "n_features": 5,
+          "name": "syn_reg",
+          "source": "synthetic",
+          "task": "regression"
+        }
+      ],
+      "dev": [
+        {
+          "data_seed": 1,
+          "imbalance": [
+            0.8,
+            0.12,
+            0.08
+          ],
+          "n": 500,
+          "n_features": 6,
+          "name": "syn_clf_dev",
+          "noise": 0.02,
+          "source": "synthetic",
+          "task": "classification"
+        }
+      ]
+    },
+    "experiment": "coreset",
+    "learning_curve_points": 6,
+    "local_groups": 8,
+    "local_ratios": [
+      0.5,
+      0.75,
+      0.9,
+      1.0
+    ],
+    "log_dir": "results/logs",
+    "min_detectable_effect": 0.05,
+    "n_estimators": [
+      1,
+      4
+    ],
+    "name": "smoke",
+    "out_csv": "results/tables/smoke_coreset.csv",
+    "perest_mode": "single_fit",
+    "planning": {
+      "sd_dataset": 0.02,
+      "sd_seed": 0.03
+    },
+    "quantile_levels": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.425,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.725,
+      0.75,
+      0.775,
+      0.8,
+      0.825,
+      0.85,
+      0.875,
+      0.9,
+      0.925,
+      0.95,
+      0.975
+    ],
+    "references": [
+      "native",
+      "native_tuned"
+    ],
+    "reg_aggregators": [
+      "mixture",
+      "log_pool",
+      "quantile_mean",
+      "quantile_median"
+    ],
+    "seeds": [
+      0,
+      1
+    ],
+    "selection_seeds": [
+      0,
+      1
+    ],
+    "split_seeds": [
+      0
+    ],
+    "test_size": 0.3,
+    "val_fraction": 0.2
+  },
+  "expected": {
+    "budgets": {
+      "syn_clf_a": [
+        126,
+        210
+      ],
+      "syn_clf_b": [
+        84,
+        140
+      ],
+      "syn_clf_dev": [
+        105,
+        175
+      ],
+      "syn_reg": [
+        84,
+        140
+      ]
+    },
+    "datasets": {
+      "syn_clf_a": "classification",
+      "syn_clf_b": "classification",
+      "syn_clf_dev": "classification",
+      "syn_reg": "regression"
+    },
+    "methods": {
+      "classification": [
+        "full",
+        "random",
+        "stratified",
+        "balanced",
+        "balanced_corrected",
+        "kmeans_stratified",
+        "uncertainty_mix",
+        "uncertainty_mix_corrected",
+        "embedding_kmeans",
+        "representative",
+        "perest_random",
+        "perest_partition",
+        "perest_representative",
+        "builtin_subsample",
+        "builtin_majority_downsample"
+      ],
+      "regression": [
+        "full",
+        "random",
+        "stratified",
+        "balanced",
+        "kmeans_stratified",
+        "uncertainty_mix",
+        "embedding_kmeans",
+        "representative",
+        "perest_random",
+        "perest_partition",
+        "perest_representative",
+        "builtin_subsample"
+      ]
+    },
+    "required_baselines": [
+      "full",
+      "random",
+      "builtin_subsample",
+      "builtin_majority_downsample"
+    ],
+    "seeds": [
+      0,
+      1
+    ]
+  },
+  "experiment": "coreset",
+  "family": [
+    [
+      "stratified",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "stratified",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "stratified",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "stratified",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "stratified",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "stratified",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "stratified",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "stratified",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "balanced",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "balanced",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "balanced",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "balanced",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "balanced",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "balanced",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "balanced",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "balanced",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "balanced_corrected",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "balanced_corrected",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "balanced_corrected",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "balanced_corrected",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "balanced_corrected",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "balanced_corrected",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "balanced_corrected",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "balanced_corrected",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "uncertainty_mix_corrected",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "representative",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "representative",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "representative",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "representative",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "representative",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "representative",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "representative",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "representative",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "perest_random",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "perest_random",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "perest_random",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "perest_random",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "perest_random",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "perest_random",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "perest_random",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "perest_random",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "perest_partition",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "perest_partition",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "perest_partition",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "perest_partition",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "perest_partition",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "perest_partition",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "perest_partition",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "perest_partition",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "perest_representative",
+      "f0.3",
+      "log_loss"
+    ],
+    [
+      "perest_representative",
+      "f0.3",
+      "accuracy"
+    ],
+    [
+      "perest_representative",
+      "f0.3",
+      "roc_auc"
+    ],
+    [
+      "perest_representative",
+      "f0.3",
+      "ece"
+    ],
+    [
+      "perest_representative",
+      "f0.5",
+      "log_loss"
+    ],
+    [
+      "perest_representative",
+      "f0.5",
+      "accuracy"
+    ],
+    [
+      "perest_representative",
+      "f0.5",
+      "roc_auc"
+    ],
+    [
+      "perest_representative",
+      "f0.5",
+      "ece"
+    ],
+    [
+      "stratified",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "stratified",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "stratified",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "stratified",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "balanced",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "balanced",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "balanced",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "balanced",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "kmeans_stratified",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "uncertainty_mix",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "embedding_kmeans",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "representative",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "representative",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "representative",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "representative",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "perest_random",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "perest_random",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "perest_random",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "perest_random",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "perest_partition",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "perest_partition",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "perest_partition",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "perest_partition",
+      "f0.5",
+      "crps"
+    ],
+    [
+      "perest_representative",
+      "f0.3",
+      "rmse"
+    ],
+    [
+      "perest_representative",
+      "f0.3",
+      "crps"
+    ],
+    [
+      "perest_representative",
+      "f0.5",
+      "rmse"
+    ],
+    [
+      "perest_representative",
+      "f0.5",
+      "crps"
+    ]
+  ],
+  "grids": {
+    "syn_clf_a": {
+      "budgets": {
+        "f0.3": 126,
+        "f0.5": 210
+      },
+      "learning_curve": [
+        10,
+        18,
+        34,
+        62,
+        114
+      ],
+      "n_train": 420
+    },
+    "syn_clf_b": {
+      "budgets": {
+        "f0.3": 84,
+        "f0.5": 140
+      },
+      "learning_curve": [
+        15,
+        23,
+        37,
+        57,
+        90
+      ],
+      "n_train": 280
+    },
+    "syn_clf_dev": {
+      "budgets": {
+        "f0.3": 105,
+        "f0.5": 175
+      },
+      "learning_curve": [
+        15,
+        25,
+        40,
+        66,
+        107
+      ],
+      "n_train": 350
+    },
+    "syn_reg": {
+      "budgets": {
+        "f0.3": 84,
+        "f0.5": 140
+      },
+      "learning_curve": [
+        10,
+        17,
+        29,
+        49,
+        83
+      ],
+      "n_train": 280
+    }
+  },
+  "n_cells": 236,
+  "shard": null,
+  "split_hashes": {
+    "syn_clf_a|0": "65f668c0783fdad6",
+    "syn_clf_b|0": "7b5a751fa9321f90",
+    "syn_clf_dev|0": "4f25ca0d5bbe4567",
+    "syn_reg|0": "dd5f36da03e0a90c"
+  },
+  "tabpfn_version": null
+}

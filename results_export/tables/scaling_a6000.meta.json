@@ -1,0 +1,317 @@
+{
+  "backend": {
+    "fit_mode": "fit_preprocessors",
+    "inference_precision": "auto",
+    "name": "tabpfn-3.5",
+    "version": "3.5"
+  },
+  "backend_meta": {
+    "backend": "tabpfn-3.5",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A6000",
+    "inference_config": {
+      "CLASS_SHIFT_METHOD": "shuffle",
+      "ENABLE_GPU_PREPROCESSING": true,
+      "FEATURE_SHIFT_METHOD": "shuffle",
+      "FEATURE_SUBSAMPLING_CONSTANT_FEATURE_COUNT": 50,
+      "FEATURE_SUBSAMPLING_IMPORTANCE_TOP_K_COUNT": 150,
+      "FEATURE_SUBSAMPLING_METHOD": "balanced",
+      "FINGERPRINT_FEATURE": true,
+      "FIX_NAN_BORDERS_AFTER_TARGET_TRANSFORM": true,
+      "MAX_CPU_SAMPLES": 5000,
+      "MAX_NUMBER_OF_CLASSES": 160,
+      "MAX_NUMBER_OF_FEATURES": 20000,
+      "MAX_NUMBER_OF_SAMPLES": 1000000,
+      "MAX_UNIQUE_FOR_CATEGORICAL_FEATURES": 1000000,
+      "MIN_CARDINALITY_FOR_TEXT": 30,
+      "MIN_NUMBER_SAMPLES_FOR_CATEGORICAL_INFERENCE": 100,
+      "MIN_UNIQUE_FOR_NUMERICAL_FEATURES": 4,
+      "N_ESTIMATORS": 8,
+      "OUTLIER_REMOVAL_STD": 12.0,
+      "PASSTHROUGH_INF": false,
+      "POLYNOMIAL_FEATURES": "no",
+      "PREPROCESS_TRANSFORMS": [
+        {
+          "append_original": false,
+          "categorical_name": "ordinal_shuffled",
+          "differentiable": false,
+          "global_transformer_name": null,
+          "max_features_per_estimator": 768,
+          "max_onehot_cardinality": null,
+          "name": "none"
+        }
+      ],
+      "REGRESSION_Y_PREPROCESS_TRANSFORMS": [
+        null,
+        "safepower"
+      ],
+      "SAMPLE_SUBSAMPLING_METHOD": "auto",
+      "SOFTMAX_TEMPERATURE": 1.0,
+      "SUBSAMPLE_SAMPLES": null,
+      "TEXT_N_COMPONENTS": 30,
+      "TRANSFORM_DATES": true,
+      "TRANSFORM_TEXT": true,
+      "USE_SKLEARN_16_DECIMAL_PRECISION": false,
+      "_CLASSIFICATION_DEFAULT_OUTLIER_REMOVAL_STD": 12.0,
+      "_REGRESSION_DEFAULT_OUTLIER_REMOVAL_STD": null
+    },
+    "inference_precision": "auto",
+    "model_version": "3.5",
+    "n_estimators_": 1,
+    "softmax_temperature": 1.0,
+    "tabpfn_version": "9.0.0",
+    "timing": {
+      "fit_seconds": 2.1061094619799405,
+      "predict_seconds": 0.09492642804980278
+    }
+  },
+  "config": {
+    "aggregator_kwargs": {},
+    "aggregators": [
+      "mean"
+    ],
+    "backend": {
+      "device": "cuda",
+      "fit_mode": "fit_preprocessors",
+      "name": "tabpfn",
+      "version": "3.5"
+    },
+    "budget_factor": 2,
+    "budget_start": 512,
+    "cache_dir": null,
+    "datasets": {
+      "confirm": [],
+      "dev": [
+        {
+          "data_id": 1489,
+          "name": "phoneme",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 537,
+          "name": "houses",
+          "source": "openml",
+          "task": "regression"
+        },
+        {
+          "data_id": 151,
+          "name": "electricity",
+          "source": "openml",
+          "task": "classification"
+        },
+        {
+          "data_id": 23512,
+          "name": "higgs",
+          "source": "openml",
+          "task": "classification"
+        }
+      ]
+    },
+    "experiment": "scaling",
+    "log_dir": "results/logs",
+    "max_budget": null,
+    "n_estimators": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "name": "scaling_a6000",
+    "out_csv": "results/tables/scaling_a6000.csv",
+    "quantile_levels": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.425,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.725,
+      0.75,
+      0.775,
+      0.8,
+      0.825,
+      0.85,
+      0.875,
+      0.9,
+      0.925,
+      0.95,
+      0.975
+    ],
+    "references": [
+      "native",
+      "native_tuned"
+    ],
+    "reg_aggregators": [
+      "mixture"
+    ],
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "test_size": 0.3,
+    "val_fraction": 0.2,
+    "warmup": true
+  },
+  "expected": {
+    "budgets": {
+      "electricity": [
+        512,
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        31718
+      ],
+      "higgs": [
+        512,
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        32768,
+        65536,
+        68635
+      ],
+      "houses": [
+        512,
+        1024,
+        2048,
+        4096,
+        8192,
+        14448
+      ],
+      "phoneme": [
+        512,
+        1024,
+        2048,
+        3782
+      ]
+    },
+    "datasets": {
+      "electricity": "classification",
+      "higgs": "classification",
+      "houses": "regression",
+      "phoneme": "classification"
+    },
+    "methods": {
+      "classification": [
+        "mean"
+      ],
+      "regression": [
+        "mixture"
+      ]
+    },
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "experiment": "scaling",
+  "git_commit": "c4151277d78f97258847970be43bcd0b88f1c369",
+  "grids": {
+    "electricity": {
+      "budgets": [
+        512,
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        31718
+      ],
+      "n_train": 31718
+    },
+    "higgs": {
+      "budgets": [
+        512,
+        1024,
+        2048,
+        4096,
+        8192,
+        16384,
+        32768,
+        65536,
+        68635
+      ],
+      "n_train": 68635
+    },
+    "houses": {
+      "budgets": [
+        512,
+        1024,
+        2048,
+        4096,
+        8192,
+        14448
+      ],
+      "n_train": 14448
+    },
+    "phoneme": {
+      "budgets": [
+        512,
+        1024,
+        2048,
+        3782
+      ],
+      "n_train": 3782
+    }
+  },
+  "hostname": "songcpu6",
+  "n_cells": 520,
+  "shard": null,
+  "split_hashes": {
+    "electricity|0": "08ac576dc1dc3ddd",
+    "electricity|1": "a5ecd644a6ca1eeb",
+    "electricity|2": "7c8890f0992f61f5",
+    "electricity|3": "c3f919bf88c35d77",
+    "electricity|4": "2b189c9d3edc63a0",
+    "higgs|0": "e2204e565c24d00a",
+    "higgs|1": "ceeff1e3bcd22475",
+    "higgs|2": "9d815f0edd3099f8",
+    "higgs|3": "34d47ee04a10e385",
+    "higgs|4": "bd458b19b10a36aa",
+    "houses|0": "4efd9329625d2681",
+    "houses|1": "822f972ddf510499",
+    "houses|2": "383c3248becb1a19",
+    "houses|3": "023b19ee237b559c",
+    "houses|4": "7b1f69b9e9f0e560",
+    "phoneme|0": "d27004160ba2e1bb",
+    "phoneme|1": "e9a83b0cb5559692",
+    "phoneme|2": "7de5f508c636cf03",
+    "phoneme|3": "14e9f0e1d168e2e9",
+    "phoneme|4": "e8085e2b771db709"
+  },
+  "tabpfn_version": "9.0.0",
+  "timing_csv": "results/tables/scaling_a6000.timing.csv"
+}

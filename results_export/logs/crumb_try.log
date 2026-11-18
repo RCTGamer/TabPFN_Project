@@ -1,0 +1,13 @@
+2026-10-29 14:42:03,830 INFO run crumb_try: 12 cells (0 already done) -> results/tables/crumb_try.csv
+2026-10-29 14:42:41,970 INFO cell 1/12 coreset|electricity|s0|r0|full|full|31718 rows=4 wall=38.13s peak_gpu_mb=1873
+2026-10-29 14:42:47,105 INFO cell 2/12 coreset|electricity|s0|r0|perest_random|a1024|1024 rows=4 wall=5.13s peak_gpu_mb=1146
+2026-10-29 14:43:13,714 INFO cell 3/12 coreset|electricity|s0|r0|crumb|a1024|1024 rows=4 wall=26.61s peak_gpu_mb=982
+2026-10-29 14:43:46,982 INFO cell 4/12 coreset|electricity|s0|r0|crumb_perest|a1024|1024 rows=4 wall=33.27s peak_gpu_mb=982
+2026-10-29 14:44:14,517 INFO cell 5/12 coreset|houses|s0|r0|full|full|14448 rows=2 wall=27.53s peak_gpu_mb=2021
+2026-10-29 14:44:38,676 INFO cell 6/12 coreset|houses|s0|r0|perest_random|a1024|1024 rows=2 wall=24.16s peak_gpu_mb=2021
+2026-10-29 14:45:20,845 INFO cell 7/12 coreset|houses|s0|r0|crumb|a1024|1024 rows=2 wall=42.17s peak_gpu_mb=1312
+2026-10-29 14:46:08,565 INFO cell 8/12 coreset|houses|s0|r0|crumb_perest|a1024|1024 rows=2 wall=47.72s peak_gpu_mb=1312
+2026-10-29 14:46:11,221 INFO cell 9/12 coreset|phoneme|s0|r0|full|full|3782 rows=4 wall=2.66s peak_gpu_mb=968
+2026-10-29 14:46:14,946 INFO cell 10/12 coreset|phoneme|s0|r0|perest_random|a1024|1024 rows=4 wall=3.72s peak_gpu_mb=957
+2026-10-29 14:46:33,070 INFO cell 11/12 coreset|phoneme|s0|r0|crumb|a1024|1024 rows=4 wall=18.12s peak_gpu_mb=915
+2026-10-29 14:46:52,372 INFO cell 12/12 coreset|phoneme|s0|r0|crumb_perest|a1024|1024 rows=4 wall=19.30s peak_gpu_mb=915

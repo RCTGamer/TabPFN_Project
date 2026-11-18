@@ -1,0 +1,12 @@
+2026-10-08 02:38:51,160 INFO run coreset_v1.shard1: 11460 cells (0 already done) -> results/tables/coreset_v1.shard1.csv
+2026-10-08 02:39:19,033 INFO cell 1/11460 coreset|electricity|s0|r0|random|f0.5|15859 rows=4 wall=27.87s peak_gpu_mb=1500
+2026-10-08 02:39:38,435 INFO cell 2/11460 coreset|electricity|s0|r0|balanced|f0.5|15859 rows=8 wall=19.40s peak_gpu_mb=1500
+2026-10-08 02:39:58,061 INFO cell 3/11460 coreset|electricity|s0|r0|uncertainty_mix|f0.5|15859 rows=8 wall=19.63s peak_gpu_mb=1500
+2026-10-08 02:40:35,312 INFO cell 4/11460 coreset|electricity|s0|r0|perest_random|f0.5|15859 rows=4 wall=37.25s peak_gpu_mb=1491
+2026-10-08 02:40:54,581 INFO cell 5/11460 coreset|electricity|s0|r0|builtin_subsample|f0.5|15859 rows=4 wall=19.27s peak_gpu_mb=1500
+2026-10-08 02:41:06,480 INFO cell 6/11460 coreset|electricity|s0|r0|random|f0.2|6344 rows=4 wall=11.90s peak_gpu_mb=1271
+2026-10-08 02:41:17,833 INFO cell 7/11460 coreset|electricity|s0|r0|balanced|f0.2|6344 rows=8 wall=11.35s peak_gpu_mb=1271
+2026-10-08 02:41:28,842 INFO cell 8/11460 coreset|electricity|s0|r0|uncertainty_mix|f0.2|6344 rows=8 wall=11.01s peak_gpu_mb=1271
+2026-10-08 02:41:57,214 INFO cell 9/11460 coreset|electricity|s0|r0|perest_random|f0.2|6344 rows=4 wall=28.37s peak_gpu_mb=1262
+2026-10-08 02:42:07,789 INFO cell 10/11460 coreset|electricity|s0|r0|builtin_subsample|f0.2|6344 rows=4 wall=10.57s peak_gpu_mb=1271
+2026-10-08 02:42:16,524 INFO cell 11/11460 coreset|electricity|s0|r0|random|f0.1|3172 rows=4 wall=8.73s peak_gpu_mb=1196
