@@ -1,0 +1,33 @@
+# Main baseline, filled in on all 8 datasets: one random subsample of n rows shared by all 8 estimators, n from 512
+# up to half the training rows, plus full context. Before this run the curve existed only for 4 datasets (run A,
+# scaling_dev.yaml) and on its own splits; this run uses the same split seeds as the perest runs, so it pairs with them.
+#   python -m tabpfn_lab.cli coreset --config configs/fill_subsample_curve.yaml
+#   python -m tabpfn_lab.cli analyze --csv results/tables/fill_subsample_curve.csv
+# Budgets of half the training rows or more are dropped per dataset (the harness needs n_train > 2 * budget); `full`
+# covers the top end. `random` also adds 6 small learning-curve budgets per dataset. Cheap: one fit per cell.
+name: fill_subsample_curve
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: electricity, source: openml, data_id: 151, task: classification}
+    - {name: jungle_chess, source: openml, data_id: 41027, task: classification}
+    - {name: jannis, source: openml, data_id: 41168, task: classification}
+    - {name: higgs, source: openml, data_id: 23512, task: classification}
+    - {name: house_16H, source: openml, data_id: 574, task: regression}
+    - {name: fried, source: openml, data_id: 564, task: regression}
+    - {name: houses, source: openml, data_id: 537, task: regression}
+    - {name: phoneme, source: openml, data_id: 1489, task: classification}
+  confirm: []
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: []
+budget_absolute: [512, 1024, 2048, 4096, 8192, 16384, 32768]   # rows in the one shared context
+coreset_methods: [random]
+baseline: random
+combined_aggregators: []
+split_seeds: 3
+selection_seeds: 2
+cache_dir: null
+log_dir: results/logs
+out_csv: results/tables/fill_subsample_curve.csv

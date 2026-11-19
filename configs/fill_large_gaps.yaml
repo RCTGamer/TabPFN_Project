@@ -1,0 +1,34 @@
+# Methods that so far ran only on electricity, houses and phoneme (perest_dev.yaml, perest_crumb.yaml), now on the
+# five larger datasets of perest_gate_large.yaml, with the same split and selection seeds so the tables pair.
+#   python -m tabpfn_lab.cli coreset --config configs/fill_large_gaps.yaml
+#   python -m tabpfn_lab.cli analyze --csv results/tables/fill_large_gaps.csv
+# Kept: TabPFN's own subsampling (a main baseline), stratified sampling (the common alternative to random), local_mix
+# at r = 0.75 and both CRUMB variants. Left out: perest_partition and perest_representative (tied with random on all
+# three small datasets) and perest_kcenter (worse everywhere). local_mix and CRUMB are transductive.
+# Cost: CRUMB and local_mix are 8 fits per cell plus selection; herding grows with n_train (largest on higgs, jannis).
+name: fill_large_gaps
+backend: {name: tabpfn, version: "3.5", device: cuda, fit_mode: fit_preprocessors}
+datasets:
+  dev:
+    - {name: jungle_chess, source: openml, data_id: 41027, task: classification}
+    - {name: jannis, source: openml, data_id: 41168, task: classification}
+    - {name: higgs, source: openml, data_id: 23512, task: classification}
+    - {name: house_16H, source: openml, data_id: 574, task: regression}
+    - {name: fried, source: openml, data_id: 564, task: regression}
+  confirm: []
+test_size: 0.3
+n_estimators: 8
+aggregator: mean
+budget_fractions: []
+budget_absolute: [1024]          # rows per estimator
+coreset_methods: [perest_random, builtin_subsample, perest_stratified, local_mix, crumb, crumb_perest]
+local_ratios: [0.75]
+local_groups: 8
+perest_mode: single_fit
+baseline: perest_random
+combined_aggregators: []
+split_seeds: 3
+selection_seeds: 2
+cache_dir: null
+log_dir: results/logs
+out_csv: results/tables/fill_large_gaps.csv
