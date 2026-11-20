@@ -1,0 +1,294 @@
+{
+  "backend": {
+    "fit_mode": "fit_preprocessors",
+    "inference_precision": "auto",
+    "name": "tabpfn-3.5",
+    "version": "3.5"
+  },
+  "backend_meta": {
+    "backend": "tabpfn-3.5",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A6000",
+    "ensemble_softmax_temperature": 1.0,
+    "inference_config": {
+      "CLASS_SHIFT_METHOD": "shuffle",
+      "ENABLE_GPU_PREPROCESSING": true,
+      "FEATURE_SHIFT_METHOD": "shuffle",
+      "FEATURE_SUBSAMPLING_CONSTANT_FEATURE_COUNT": 50,
+      "FEATURE_SUBSAMPLING_IMPORTANCE_TOP_K_COUNT": 150,
+      "FEATURE_SUBSAMPLING_METHOD": "balanced",
+      "FINGERPRINT_FEATURE": true,
+      "FIX_NAN_BORDERS_AFTER_TARGET_TRANSFORM": true,
+      "MAX_CPU_SAMPLES": 5000,
+      "MAX_NUMBER_OF_CLASSES": 160,
+      "MAX_NUMBER_OF_FEATURES": 20000,
+      "MAX_NUMBER_OF_SAMPLES": 1000000,
+      "MAX_UNIQUE_FOR_CATEGORICAL_FEATURES": 1000000,
+      "MIN_CARDINALITY_FOR_TEXT": 30,
+      "MIN_NUMBER_SAMPLES_FOR_CATEGORICAL_INFERENCE": 100,
+      "MIN_UNIQUE_FOR_NUMERICAL_FEATURES": 4,
+      "N_ESTIMATORS": 8,
+      "OUTLIER_REMOVAL_STD": 12.0,
+      "PASSTHROUGH_INF": false,
+      "POLYNOMIAL_FEATURES": "no",
+      "PREPROCESS_TRANSFORMS": [
+        {
+          "append_original": false,
+          "categorical_name": "ordinal_shuffled",
+          "differentiable": false,
+          "global_transformer_name": null,
+          "max_features_per_estimator": 768,
+          "max_onehot_cardinality": null,
+          "name": "none"
+        }
+      ],
+      "REGRESSION_Y_PREPROCESS_TRANSFORMS": [
+        null,
+        "safepower"
+      ],
+      "SAMPLE_SUBSAMPLING_METHOD": "auto",
+      "SOFTMAX_TEMPERATURE": 1.0,
+      "SUBSAMPLE_SAMPLES": null,
+      "TEXT_N_COMPONENTS": 30,
+      "TRANSFORM_DATES": true,
+      "TRANSFORM_TEXT": true,
+      "USE_SKLEARN_16_DECIMAL_PRECISION": false,
+      "_CLASSIFICATION_DEFAULT_OUTLIER_REMOVAL_STD": 12.0,
+      "_REGRESSION_DEFAULT_OUTLIER_REMOVAL_STD": null
+    },
+    "inference_precision": "auto",
+    "model_version": "3.5",
+    "n_estimators_": 8,
+    "softmax_temperature": 1.0,
+    "tabpfn_version": "9.0.0",
+    "timing": {
+      "fit_seconds": 2.2836309471167624,
+      "predict_seconds": 6.84294263785705
+    }
+  },
+  "config": {
+    "aggregator": "mean",
+    "aggregator_kwargs": {},
+    "aggregators": [
+      "mean"
+    ],
+    "backend": {
+      "device": "cuda",
+      "fit_mode": "fit_preprocessors",
+      "name": "tabpfn",
+      "version": "3.5"
+    },
+    "baseline": "perest_random",
+    "budget_absolute": [
+      1024
+    ],
+    "budget_fractions": [],
+    "cache_dir": null,
+    "combined_aggregators": [],
+    "coreset_kwargs": {
+      "cluster_experts_tuned": {
+        "val_fraction": 0.2,
+        "val_max": 2000
+      },
+      "experts_full": {
+        "max_clusters": 128,
+        "val_fraction": 0.2,
+        "val_max": 2000
+      },
+      "experts_overlap": {
+        "max_clusters": 128,
+        "val_fraction": 0.2,
+        "val_max": 2000
+      },
+      "experts_scaled": {
+        "max_clusters": 128,
+        "val_fraction": 0.2,
+        "val_max": 2000
+      },
+      "experts_weighted": {
+        "max_clusters": 128,
+        "val_fraction": 0.2,
+        "val_max": 2000
+      }
+    },
+    "coreset_methods": [
+      "perest_random",
+      "cluster_experts_tuned",
+      "experts_scaled",
+      "experts_weighted",
+      "experts_overlap",
+      "experts_full"
+    ],
+    "datasets": {
+      "confirm": [],
+      "dev": [
+        {
+          "data_id": 537,
+          "name": "houses",
+          "source": "openml",
+          "task": "regression"
+        }
+      ]
+    },
+    "experiment": "coreset",
+    "learning_curve_points": 6,
+    "local_groups": 8,
+    "local_ratios": [
+      0.5,
+      0.75,
+      0.9,
+      1.0
+    ],
+    "log_dir": "results/logs",
+    "n_estimators": 8,
+    "name": "fill_experts_houses",
+    "out_csv": "results/tables/fill_experts_houses.csv",
+    "perest_mode": "single_fit",
+    "quantile_levels": [
+      0.025,
+      0.05,
+      0.075,
+      0.1,
+      0.125,
+      0.15,
+      0.175,
+      0.2,
+      0.225,
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.425,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.725,
+      0.75,
+      0.775,
+      0.8,
+      0.825,
+      0.85,
+      0.875,
+      0.9,
+      0.925,
+      0.95,
+      0.975
+    ],
+    "references": [
+      "native",
+      "native_tuned"
+    ],
+    "reg_aggregators": [
+      "mixture",
+      "log_pool",
+      "quantile_mean",
+      "quantile_median"
+    ],
+    "seeds": [
+      0
+    ],
+    "selection_seeds": [
+      0
+    ],
+    "split_seeds": [
+      0,
+      1,
+      2
+    ],
+    "test_size": 0.3,
+    "val_fraction": 0.2
+  },
+  "expected": {
+    "budgets": {
+      "houses": [
+        1024
+      ]
+    },
+    "datasets": {
+      "houses": "regression"
+    },
+    "methods": {
+      "classification": [
+        "full",
+        "perest_random",
+        "cluster_experts_tuned",
+        "cluster_experts_tuned+bias",
+        "cluster_experts_tuned+heuristic",
+        "experts_scaled",
+        "experts_scaled+heuristic",
+        "experts_scaled+hard",
+        "experts_weighted",
+        "experts_weighted+heuristic",
+        "experts_weighted+hard",
+        "experts_overlap",
+        "experts_overlap+heuristic",
+        "experts_overlap+hard",
+        "experts_full",
+        "experts_full+heuristic",
+        "experts_full+hard"
+      ],
+      "regression": [
+        "full",
+        "perest_random",
+        "cluster_experts_tuned",
+        "cluster_experts_tuned+bias",
+        "cluster_experts_tuned+heuristic",
+        "experts_scaled",
+        "experts_scaled+heuristic",
+        "experts_scaled+hard",
+        "experts_weighted",
+        "experts_weighted+heuristic",
+        "experts_weighted+hard",
+        "experts_overlap",
+        "experts_overlap+heuristic",
+        "experts_overlap+hard",
+        "experts_full",
+        "experts_full+heuristic",
+        "experts_full+hard"
+      ]
+    },
+    "required_baselines": [
+      "full"
+    ],
+    "seeds": [
+      0
+    ]
+  },
+  "experiment": "coreset",
+  "family": [],
+  "grids": {
+    "houses": {
+      "budgets": {
+        "a1024": 1024
+      },
+      "learning_curve": [
+        10,
+        37,
+        139,
+        519,
+        1937,
+        7224
+      ],
+      "n_train": 14448
+    }
+  },
+  "n_cells": 21,
+  "shard": null,
+  "split_hashes": {
+    "houses|0": "4efd9329625d2681",
+    "houses|1": "822f972ddf510499",
+    "houses|2": "383c3248becb1a19"
+  },
+  "tabpfn_version": "9.0.0"
+}
